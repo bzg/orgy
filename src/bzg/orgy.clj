@@ -477,7 +477,10 @@
   (let [config (load-config)
         posts  (load-posts)
         ;; Collect which [lang section] pairs exist for menu building
-        sections (->> posts (map (juxt :lang :section)) set)]
+        sections (->> posts (map (juxt :lang :section)) set)
+        ;; Include all languages that have posts, plus any from config
+        langs  (distinct (concat (:languages config)
+                                 (map :lang posts)))]
     (println (str "Building " (count posts) " posts..."))
 
     ;; Render each post
@@ -485,9 +488,8 @@
       (render-post! config post sections))
 
     ;; Per-language indexes
-    (doseq [lang (:languages config)]
+    (doseq [lang langs]
       (let [lang-posts (filter #(= (:lang %) lang) posts)
-            langs      (:languages config)
             menu       (cond-> []
                          (contains? sections [lang "notes"])
                          (conj {:name "Notes" :url (str "/" lang "/notes/")})
