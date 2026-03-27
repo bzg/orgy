@@ -1,0 +1,18 @@
+{;; Site title (default: name of the current directory).
+ :title     "My Blog"
+
+ ;; Base URL for absolute links (RSS, etc.). No trailing slash.
+ :base-url  "https://example.com"
+
+ ;; Copyright notice displayed in the footer.
+ :copyright "© 2026 Author — Creative Commons BY-SA 4.0"
+
+ ;; Languages to generate indexes and feeds for (default: ["en"]).
+ ;; Language is detected from filenames: post.fr.org → "fr", post.en.org → "en".
+ ;; Files without a language suffix default to "en".
+ :languages ["en" "fr"]
+
+ ;; Optional CSS theme URL, loaded after Pico 2.
+ ;; Can be a CDN URL or a local path (served from static/).
+ ;; Leave empty or remove for default Pico styling.
+ :theme-url "https://cdn.jsdelivr.net/gh/bzg/pico-themes@latest/teletype.css"}

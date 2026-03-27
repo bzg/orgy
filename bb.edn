@@ -1,0 +1,18 @@
+{:deps
+ {org.clojars.bzg/organ {:mvn/version "0.3.0"}}
+
+ :paths ["src"]
+
+ :tasks
+ {build {:doc  "Build the static site"
+         :task (do (require 'bzg.orgy)
+                   ((resolve 'bzg.orgy/build!)))}
+
+  serve {:doc  "Build and serve locally on port 1888"
+         :task (do (require 'bzg.orgy)
+                   ((resolve 'bzg.orgy/serve!) {:port 1888}))}
+
+  clean {:doc  "Remove the public/ directory"
+         :task (do (require 'babashka.fs)
+                   ((resolve 'babashka.fs/delete-tree) "public")
+                   (println "Cleaned public/"))}}}
