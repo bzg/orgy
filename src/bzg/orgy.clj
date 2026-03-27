@@ -552,3 +552,12 @@
             (.flush out)))
         (.close socket)
         (recur)))))
+
+(defn -main [& args]
+  (case (first args)
+    "serve" (serve! {:port (if-let [p (second args)]
+                             (parse-long p)
+                             1888)})
+    "clean" (do (fs/delete-tree "public")
+                (println "Cleaned public/"))
+    (build!)))
