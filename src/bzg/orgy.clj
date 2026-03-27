@@ -556,6 +556,13 @@
         ;; RSS feed
         (render-feed! config lang lang-posts)))
 
+    ;; Root index: redirect to first language
+    (write-file! "public/index.html"
+                 (str "<!DOCTYPE html><html><head>"
+                      "<meta http-equiv=\"refresh\" content=\"0;url=/"
+                      (first langs) "/\">"
+                      "</head><body></body></html>"))
+
     ;; Copy static assets
     (copy-static!)
 
