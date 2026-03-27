@@ -1,0 +1,89 @@
+#+title: Orgy
+
+A static blog generator that turns [[https://orgmode.org][Org mode]] files into a website.
+Powered by [[https://github.com/bzg/organ][organ]] and [[https://github.com/yogthos/Selmer][Selmer]], runs on [[https://babashka.org][Babashka]].
+
+* Features
+
+- Org files parsed to HTML via organ
+- Multi-language support: =post.fr.org= and =post.en.org= produce separate indexes and RSS feeds
+- Tag pages and tag index
+- Content sections (e.g. =content/notes/=)
+- Customisable [[https://picocss.com][Pico CSS]] theme
+- Override any template by placing files in =templates/=
+
+* Requirements
+
+- [[https://babashka.org][Babashka]]
+
+* Quick start
+
+1. Create a =config.edn= (see =config.edn.example=).
+
+2. Put your =.org= files under =content/=:
+
+   #+begin_example
+   content/
+     my-post.en.org
+     my-post.fr.org
+     notes/
+       some-note.en.org
+   #+end_example
+
+   Each file needs at least a =#+title:= header.  Optional: =#+date:=,
+   =#+author:=, =#+tags:=.
+
+3. Build or serve:
+
+   #+begin_src shell
+   bb build          # generates public/
+   bb serve          # build + local server on port 1888
+   bb clean          # remove public/
+   #+end_src
+
+* Configuration
+
+All keys in =config.edn= are optional:
+
+| Key        | Default        | Description                                 |
+|------------+----------------+---------------------------------------------|
+| =:title=     | directory name | Site title                                  |
+| =:base-url=  | =""=             | Base URL for absolute links (RSS, etc.)     |
+| =:copyright= | =""=             | Footer copyright notice                     |
+| =:languages= | =["en"]=         | Languages to generate indexes and feeds for |
+| =:theme-url= | /none/           | Extra CSS loaded after Pico 2               |
+
+Language is detected from filenames: =post.fr.org= produces French
+output, =post.en.org= English. Files without a language suffix default
+to ="en"=.
+
+* Templates
+
+Orgy ships with built-in templates. To override any of them, create a
+=templates/= directory and add files named:
+
+- =base.html= -- page layout
+- =post.html= -- single post
+- =list.html= -- post listing (index, section)
+- =tag.html= -- posts for a given tag
+- =tags-index.html= -- all tags
+- =feed.xml= -- RSS feed
+
+Templates use [[https://github.com/yogthos/Selmer][Selmer]] syntax.
+
+* Static assets
+
+Files in =static/= are copied verbatim into =public/= on build.
+
+* Support the Clojure(script) ecosystem
+
+If you like Clojure(script), please consider supporting maintainers by
+donating to [[https://clojuriststogether.org][clojuriststogether.org]].
+
+* License
+
+Copyright © 2026 Bastien Guerry
+
+Distributed under the Eclipse Public License 2.0.
+
+
