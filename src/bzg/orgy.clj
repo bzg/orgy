@@ -363,7 +363,8 @@
 (defn- load-posts
   "Load all org files from content/, excluding index files."
   []
-  (->> (fs/glob "content" "**/*.org")
+  (->> (concat (fs/glob "content" "*.org")
+              (fs/glob "content" "**/*.org"))
        (remove index-file?)
        (remove #(str/starts-with? (str (fs/file-name %)) "."))
        (map load-post)
@@ -426,6 +427,43 @@
                 (str "public/" lang "/" section "/index.html")
                 (str "public/" lang "/index.html"))]
     (write-file! out html)))
+
+(defn- find-index-file
+  "Find an index org file for a given language.
+   Looks for _index.{lang}.org, index.{lang}.org, _index.org, index.org."
+  [lang]
+  (some #(when (fs/exists? %) (str %))
+        [(str "content/_index." lang ".org")
+         (str "content/index." lang ".org")
+         "content/_index.org"
+         "content/index.org"]))
+
+(defn- render-index! [config lang posts sections index-file]
+  (let [langs  (distinct (concat (:languages config) (map :lang posts)))
+        menu   (cond-> []
+                 (contains? sections [lang "notes"])
+                 (conj {:name "Notes" :url (str "/" lang "/notes/")})
+                 (some #(not= % lang) langs)
+                 (into (map (fn [l] {:name l :url (str "/" l "/")})
+                            (remove #(= % lang) langs))))
+        ctx    (merge (site-context config lang) {:menu menu})]
+    (if index-file
+      (let [org-text (slurp index-file)
+            ast      (organ/parse-org org-text)
+            meta     (:meta ast)
+            ctx      (merge ctx
+                            {:title   (:title meta)
+                             :content (ast->html ast)})
+            html     (render-page "post.html" ctx)]
+        (write-file! (str "public/" lang "/index.html") html))
+      (let [lang-posts (->> posts
+                            (filter #(= (:lang %) lang))
+                            (take 10))
+            ctx        (merge ctx
+                              {:title (:title config)
+                               :posts (map #(select-keys % [:title :date :url]) lang-posts)})
+            html       (render-page "list.html" ctx)]
+        (write-file! (str "public/" lang "/index.html") html)))))
 
 (defn- render-tag-page! [config lang tag posts menu]
   (let [ctx  (merge (site-context config lang)
@@ -496,8 +534,8 @@
                          (some #(not= % lang) langs)
                          (into (map (fn [l] {:name l :url (str "/" l "/")})
                                     (remove #(= % lang) langs))))]
-        ;; Main index
-        (render-list! config lang nil lang-posts sections)
+        ;; Main index (from index file if present, else 10 latest posts)
+        (render-index! config lang posts sections (find-index-file lang))
 
         ;; Section indexes
         (doseq [[section sec-posts] (group-by :section lang-posts)
