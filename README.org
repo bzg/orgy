@@ -5,12 +5,17 @@ Powered by [[https://github.com/bzg/organ][organ]] and [[https://github.com/yogt
 
 * Features
 
-- Org files parsed to HTML via organ
+- Org files parsed to HTML via organ (inline markup, code blocks, tables, lists, ...)
 - Multi-language support: =post.fr.org= and =post.en.org= produce separate indexes and RSS feeds
 - Tag pages and tag index
-- Content sections (e.g. =content/notes/=)
-- Customisable [[https://picocss.com][Pico CSS]] theme
-- Override any template by placing files in =templates/=
+- Content sections: subdirectories become categories with their own index
+- Client-side search
+- Syntax highlighting via [[https://highlightjs.org][highlight.js]] (loaded only on pages with code)
+- SEO: meta description, Open Graph tags, canonical URLs, =sitemap.xml=
+- Customisable CSS theme (pico-themes name, URL, or local file)
+- Configurable navigation menu with support for direct links
+- Draft support (=#+draft: true= excludes a file from export)
+- Override any template via =orgy -i DIR init=
 
 * Requirements
 
@@ -18,62 +23,164 @@ Powered by [[https://github.com/bzg/organ][organ]] and [[https://github.com/yogt
 
 * Quick start
 
-1. Create a =config.edn= (see =config.edn.example=).
+#+begin_src shell
+# Initialize config and templates (optional)
+orgy -i myblog init
 
-2. Put your =.org= files under =content/=:
+# Build
+orgy -i myblog
 
-   #+begin_example
-   content/
-     my-post.en.org
-     my-post.fr.org
-     notes/
-       some-note.en.org
-   #+end_example
+# Build and serve locally
+orgy -i myblog serve
 
-   Each file needs at least a =#+title:= header.  Optional: =#+date:=,
-   =#+author:=, =#+tags:=.
+# Show all options
+orgy help
+#+end_src
 
-3. Build or serve:
+* Directory layout
 
-   #+begin_src shell
-   bb build          # generates public/
-   bb serve          # build + local server on port 1888
-   bb clean          # remove public/
-   #+end_src
+#+begin_example
+myblog/
+  config.edn            # site configuration (created by `init`)
+  index.en.org           # homepage (optional, else 10 latest posts)
+  index.fr.org           # French homepage
+  about.en.org           # root-level page → /en/about/
+  notes/                 # section → /en/notes/, /fr/notes/
+    my-post.en.org       # post → /en/notes/my-post/
+    my-post.fr.org       # post → /fr/notes/my-post/
+    diagram.png          # copied to /notes/diagram.png
+  static/                # copied verbatim to output root
+    img/photo.jpg        # → /img/photo.jpg
+    favicon.ico          # → /favicon.ico
+  templates/             # custom Selmer templates (created by `init`)
+#+end_example
+
+- *Sections*: any subdirectory (except =static/=, =templates/=, =public/=,
+  =.git/=) is a section with its own index page.
+- *Static assets*: =static/= contents are copied to the output root.
+  Non-org files elsewhere in the tree are also copied, preserving paths.
+- *Language detection*: =post.fr.org= → French, =post.en.org= → English.
+  No suffix defaults to ="en"=.
+- *Index pages*: =index.{lang}.org= or =_index.{lang}.org= at the root
+  renders as the homepage for that language.
+
+* Org file headers
+
+Each =.org= file supports these headers:
+
+#+begin_example
+#+title: My Post Title
+#+date: 2026-03-28
+#+author: Author Name
+#+tags[]: emacs org-mode
+#+draft: true
+#+end_example
+
+All headers are optional. Files with =#+draft: true= are excluded from
+the build. Files without =#+title= still appear in the nav (using the
+filename as label).
+
+* CLI
+
+#+begin_example
+Usage: orgy -i DIR [options] [command]
+
+Options:
+  -i, --input-dir DIR   Input directory containing org files (required)
+  -o, --output-dir DIR  Output directory (default: ./public)
+  -c, --config FILE     Path to config.edn (default: input-dir or working dir)
+  -t, --theme VALUE     CSS theme (see examples below)
+
+Commands:
+  (none)           Build the static site
+  serve [port]     Build and serve locally (default port: 1888)
+  init             Export templates and config for customization
+  clean            Remove the output directory
+  help             Show this help
+#+end_example
+
+The =--theme= option accepts four forms:
+
+#+begin_example
+# pico-themes name → loaded from CDN as <link>
+orgy -i myblog -t teletype
+
+# https:// URL → loaded as <link>
+orgy -i myblog -t https://example.com/my-theme.css
+
+# file:/// URL → inlined as <style>
+orgy -i myblog -t file:///home/user/mytheme.css
+
+# local .css path (relative or absolute) → inlined as <style>
+orgy -i myblog -t ./themes/custom.css
+#+end_example
 
 * Configuration
 
 All keys in =config.edn= are optional:
 
-| Key        | Default        | Description                                 |
-|------------+----------------+---------------------------------------------|
-| =:title=     | directory name | Site title                                  |
-| =:base-url=  | =""=             | Base URL for absolute links (RSS, etc.)     |
-| =:copyright= | =""=             | Footer copyright notice                     |
-| =:languages= | =["en"]=         | Languages to generate indexes and feeds for |
-| =:theme-url= | /none/           | Extra CSS loaded after Pico 2               |
+| Key          | Default        | Description                                       |
+|--------------+----------------+---------------------------------------------------|
+| =:title=     | directory name | Site title                                        |
+| =:base-url=  | =""=           | Base URL for absolute links (RSS, sitemap, etc.)  |
+| =:copyright= | =""=           | Footer copyright notice                           |
+| =:languages= | =["en"]=       | Languages to generate indexes and feeds for       |
+| =:menu=      | /all/          | Ordered list of nav entries (see below)            |
+| =:theme=     | /none/         | CSS theme (name, URL, or path — see CLI section)  |
 
-Language is detected from filenames: =post.fr.org= produces French
-output, =post.en.org= English. Files without a language suffix default
-to ="en"=.
+** Menu configuration
+
+When =:menu= is omitted, all root-level pages and sections appear in the
+nav. To control what appears and in what order:
+
+#+begin_src clojure
+:menu ["notes"                                          ;; section by slug
+       "about"                                          ;; root page by slug
+       {:name "GitHub" :url "https://github.com/me"}]   ;; direct link
+#+end_src
+
+A "Tags" link and language switcher links are always appended after the
+menu entries.
 
 * Templates
 
-Orgy ships with built-in templates. To override any of them, create a
-=templates/= directory and add files named:
+Run =orgy -i DIR init= to export all default templates into
+=DIR/templates/=. You can then edit them freely.  Available templates:
 
-- =base.html= -- page layout
-- =post.html= -- single post
-- =list.html= -- post listing (index, section)
+- =base.html= -- page layout (head, nav, footer, search, highlight.js)
+- =post.html= -- single post / page
+- =list.html= -- post listing (section index, fallback homepage)
 - =tag.html= -- posts for a given tag
 - =tags-index.html= -- all tags
 - =feed.xml= -- RSS feed
 
-Templates use [[https://github.com/yogthos/Selmer][Selmer]] syntax.
+Templates use [[https://github.com/yogthos/Selmer][Selmer]] syntax. Template variables include =title=,
+=date=, =tags=, =content=, =lang=, =menu=, =site.title=, =site.copyright=,
+=description=, =canonical=, =has-code=, =hl-langs=, =theme-link=, and =theme-inline=.
 
-* Static assets
+* Output structure
 
-Files in =static/= are copied verbatim into =public/= on build.
+#+begin_example
+public/
+  index.html              # redirect to first language
+  sitemap.xml             # generated when base-url is set
+  en/
+    index.html            # homepage
+    feed.xml              # RSS feed
+    search.json           # search index
+    notes/
+      index.html          # section listing
+      my-post/
+        index.html        # post
+    tags/
+      index.html          # all tags
+      emacs/
+        index.html        # posts tagged "emacs"
+  fr/
+    ...
+  img/                    # from static/
+  favicon.ico             # from static/
+#+end_example
 
 * Support the Clojure(script) ecosystem
 
@@ -85,5 +192,3 @@ donating to [[https://clojuriststogether.org][clojuriststogether.org]].
 Copyright © 2026 Bastien Guerry
 
 Distributed under the Eclipse Public License 2.0.
-
-

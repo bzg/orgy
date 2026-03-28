@@ -12,7 +12,13 @@
  ;; Files without a language suffix default to "en".
  :languages ["en" "fr"]
 
- ;; Optional CSS theme URL, loaded after Pico 2.
- ;; Can be a CDN URL or a local path (served from static/).
+ ;; Menu entries: list of slugs (filenames without lang/ext) to show in nav.
+ ;; Matches root-level pages and section directories. Displayed in this order.
+ ;; If omitted, all root pages and sections are shown.
+ ;; :menu ["about" "notes" "talks"]
+
+ ;; Optional CSS theme, loaded after Pico 2.
+ ;; Can be: a pico-themes name (e.g. "teletype"), an https:// URL,
+ ;; a file:/// URL, or a path to a local .css file.
  ;; Leave empty or remove for default Pico styling.
- :theme-url "https://cdn.jsdelivr.net/gh/bzg/pico-themes@latest/teletype.css"}
+ :theme "teletype"}
