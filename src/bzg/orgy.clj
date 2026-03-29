@@ -196,6 +196,7 @@
    "post.html"
    "<article>
   {% if title %}<header><h1>{{title}}</h1>
+  {% if author %}<span class=\"author\">{{author}}</span>{% endif %}
   {% if date %}<time datetime=\"{{date}}\">{{date}}</time>{% endif %}
   {% if tags|not-empty %}
   <nav class=\"tags\">
@@ -711,11 +712,15 @@
 (defn- render-post! [config post menu prev-post next-post]
   (let [lang      (:lang post)
         code-info (collect-code-langs (:ast post))
+        title     (if (:section post)
+                    (:title post)
+                    (str/capitalize (or (:title post) "")))
         ctx       (merge (site-context config lang)
                          code-info
                          {:menu        menu
-                          :title       (:title post)
+                          :title       title
                           :date        (:date post)
+                          :author      (:author post)
                           :tags        (:tags post)
                           :description (post-description post)
                           :canonical   (canonical-url config (:url post))
