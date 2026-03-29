@@ -217,6 +217,7 @@
 
    "list.html"
    "<section>
+  <h1>{{title|capitalize}}</h1>
   <ul>
     {% for post in posts %}
     <li>
