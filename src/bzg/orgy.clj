@@ -52,9 +52,8 @@
 
 (defn- load-config [overrides]
   (let [cfg-path (or (:config-path overrides)
-                     (some #(when (fs/exists? %) (str %))
-                           [(str *input-dir* "/config.edn")
-                            "config.edn"]))
+                     (let [p (str *input-dir* "/config.edn")]
+                       (when (fs/exists? p) (str p))))
         cfg   (when cfg-path
                 (-> cfg-path slurp clojure.edn/read-string))
         title (or (:title cfg) (-> *input-dir* fs/absolutize fs/file-name str))]
@@ -91,8 +90,11 @@
   <link rel=\"alternate\" type=\"application/rss+xml\" title=\"{{site.title}} ({{lang}})\" href=\"/{{lang}}/feed.xml\">
   <link rel=\"sitemap\" type=\"application/xml\" href=\"/sitemap.xml\">
   <style>
+    .container{max-width:1080px}
+    header.container{padding-bottom:1rem;margin-bottom:1.2rem}
     body>footer{text-align:center}
-    iframe{width:80%;height:60vh;display:block;margin:1em auto;border:none}
+    iframe{width:100%;aspect-ratio:4/3;display:block;margin:1em auto;border:none}
+    article img{display:block;margin:1em auto;max-width:90%}
     time{padding:.125em .375em;border-radius:4px;background:color-mix(in srgb,var(--pico-background-color) 85%,var(--pico-color));color:color-mix(in srgb,var(--pico-color) 65%,var(--pico-background-color))}
     article>header{display:flex;flex-wrap:wrap;align-items:baseline;gap:.5em}
     article>header h1{flex:1;margin:0}
@@ -138,9 +140,11 @@
   <main class=\"container\">
     {{body|safe}}
   </main>
+  {% if site.copyright|not-empty %}
   <footer class=\"container\">
     <p>{{site.copyright}}</p>
   </footer>
+  {% endif %}
   <script>
   (function(){
     var input=document.getElementById('search-input'),
@@ -230,7 +234,7 @@
 
    "tag.html"
    "<section>
-  <h1>{{tag}}</h1>
+  <h1>{{tag|capitalize}}</h1>
   <ul>
     {% for post in posts %}
     <li>
