@@ -217,7 +217,6 @@
 
    "list.html"
    "<section>
-  <h1>{{title}}</h1>
   <ul>
     {% for post in posts %}
     <li>
@@ -331,7 +330,8 @@
   (-> s
       (str/replace "&" "&amp;")
       (str/replace "<" "&lt;")
-      (str/replace ">" "&gt;")))
+      (str/replace ">" "&gt;")
+      (str/replace "\"" "&quot;")))
 
 (defn- resolve-file-url
   "For file: links, strip the prefix and rewrite static/ paths."
@@ -371,23 +371,24 @@
     (str/join
      (map (fn [node]
             (case (:type node)
-              :text      (:value node)
+              :text      (escape-html (:value node))
               :bold      (str "<strong>" (render-inline (:children node)) "</strong>")
               :italic    (str "<em>" (render-inline (:children node)) "</em>")
               :underline (str "<u>" (render-inline (:children node)) "</u>")
               :strike    (str "<del>" (render-inline (:children node)) "</del>")
-              :code      (str "<code>" (:value node) "</code>")
-              :verbatim  (str "<code>" (:value node) "</code>")
+              :code      (str "<code>" (escape-html (:value node)) "</code>")
+              :verbatim  (str "<code>" (escape-html (:value node)) "</code>")
               :link      (let [url (resolve-file-url node)]
                            (if (re-find image-ext-re url)
-                             (str "<img src=\"" url "\" alt=\""
-                                  (or (organ/inline-text (:children node)) "") "\">")
+                             (str "<img src=\"" (escape-html url) "\" alt=\""
+                                  (escape-html (or (organ/inline-text (:children node)) "")) "\">")
                              (if (seq (:children node))
-                               (str "<a href=\"" url "\">" (render-inline (:children node)) "</a>")
-                               (str "<a href=\"" url "\">" url "</a>"))))
-              :footnote-ref (str "<sup><a href=\"#fn-" (:label node)
-                                 "\" id=\"fnref-" (:label node) "\">"
-                                 (:label node) "</a></sup>")
+                               (str "<a href=\"" (escape-html url) "\">" (render-inline (:children node)) "</a>")
+                               (str "<a href=\"" (escape-html url) "\">" (escape-html url) "</a>"))))
+              :footnote-ref (let [lbl (escape-html (:label node))]
+                              (str "<sup><a href=\"#fn-" lbl
+                                   "\" id=\"fnref-" lbl "\">"
+                                   lbl "</a></sup>"))
               :footnote-inline ""
               :timestamp (:raw node)
               ""))
@@ -438,7 +439,7 @@
   "Build an HTML attribute string from an affiliated :attr :html map."
   [node]
   (when-let [attrs (get-in node [:affiliated :attr :html])]
-    (str/join (map (fn [[k v]] (str " " (name k) "=\"" v "\"")) attrs))))
+    (str/join (map (fn [[k v]] (str " " (name k) "=\"" (escape-html v) "\"")) attrs))))
 
 (defn- render-node [node]
   (case (:type node)
@@ -459,8 +460,8 @@
                             (organ/inline-text (:children link))
                             "")
                   extra (dissoc attrs :alt)]
-              (str "<img src=\"" url "\" alt=\"" alt "\""
-                   (str/join (map (fn [[k v]] (str " " (name k) "=\"" v "\"")) extra))
+              (str "<img src=\"" (escape-html url) "\" alt=\"" (escape-html alt) "\""
+                   (str/join (map (fn [[k v]] (str " " (name k) "=\"" (escape-html v) "\"")) extra))
                    ">"))
             (str "<p" (or (html-attrs node) "") ">" (render-inline c) "</p>")))
         ""))
@@ -512,10 +513,11 @@
     :comment ""
 
     :footnote-def
-    (str "<div class=\"footnote\" id=\"fn-" (:label node) "\">"
-         "<sup>" (:label node) "</sup> "
-         (render-inline (:content node))
-         " <a href=\"#fnref-" (:label node) "\">↩</a></div>")
+    (let [lbl (escape-html (:label node))]
+      (str "<div class=\"footnote\" id=\"fn-" lbl "\">"
+           "<sup>" lbl "</sup> "
+           (render-inline (:content node))
+           " <a href=\"#fnref-" lbl "\">↩</a></div>"))
 
     :drawer ""
 
@@ -873,9 +875,10 @@
           ;; Posts are sorted newest-first: prev = newer, next = older
           (let [posts-vec (vec lang-posts)]
             (doseq [i (range (count posts-vec))]
-              (render-post! config (posts-vec i) menu
-                            (get posts-vec (dec i))
-                            (get posts-vec (inc i)))))
+              (let [post (posts-vec i)]
+                (render-post! config post menu
+                              (when (:section post) (get posts-vec (dec i)))
+                              (when (:section post) (get posts-vec (inc i)))))))
 
           ;; Main index (from index file if present, else 10 latest posts)
           (render-index! config lang posts (find-index-file lang) menu)
