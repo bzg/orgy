@@ -184,10 +184,10 @@ public/
 
 * Contributing
 
-- Send a [[mailto:~bzg/orgology@lists.sr.ht?subject=\[BUG\] orgy: <SHORT EXPLICIT BUG DESCRIPTION>][bug report]]
-- Send a [[mailto:~bzg/orgology@lists.sr.ht?subject=\[PATCH\] orgy: <COMMIT SUMMARY>][patch]] (please use =git format-patch=)
-- Send a [[mailto:~bzg/orgology@lists.sr.ht?subject=\[FR\] orgy: <FEATURE REQUEST>][feature request]]
-- Share any [[mailto:~bzg/orgology@lists.sr.ht?subject=orgy: <ANYTHING>][other question or idea]]
+- Send a [[mailto:~bzg/orgology@lists.sr.ht][bug report]] with =[BUG] orgy: <SHORT EXPLICIT BUG DESCRIPTION>=
+- Send a [[mailto:~bzg/orgology@lists.sr.ht][patch]] with =[PATCH] orgy: <COMMIT SUMMARY>=
+- Send a [[mailto:~bzg/orgology@lists.sr.ht][feature request]] with =[FR] orgy: <FEATURE REQUEST>=
+- Share any [[mailto:~bzg/orgology@lists.sr.ht][other question or idea]]
 
 You can also [[mailto:bzg@bzg.fr][send me an email]] and support my work on [[https://liberapay.com/bzg/][liberapay]].
 
