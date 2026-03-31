@@ -89,7 +89,7 @@
   <link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css\">
   {% if theme-link %}<link rel=\"stylesheet\" href=\"{{theme-link}}\">{% endif %}
   {% if theme-inline %}<style>{{theme-inline|safe}}</style>{% endif %}
-  <link rel=\"alternate\" type=\"application/rss+xml\" title=\"{{site.title}} ({{lang}})\" href=\"/{{lang}}/feed.xml\">
+  {% if site.base-url|not-empty %}<link rel=\"alternate\" type=\"application/rss+xml\" title=\"{{site.title}} ({{lang}})\" href=\"/{{lang}}/feed.xml\">{% endif %}
   <link rel=\"sitemap\" type=\"application/xml\" href=\"/sitemap.xml\">
   <style>
     .container{max-width:1080px}
@@ -146,7 +146,7 @@
   </main>
   {% if site.copyright|not-empty %}
   <footer class=\"container\">
-    <p>{{site.copyright}} — Made with <a href=\"https://codeberg.org/bzg/orgy\">Orgy</a> — <a href=\"/{{lang}}/feed.xml\">RSS</a></p>
+    <p>{{site.copyright}} — Made with <a href=\"https://codeberg.org/bzg/orgy\">Orgy</a>{% if site.base-url|not-empty %} — <a href=\"/{{lang}}/feed.xml\">RSS</a>{% endif %}</p>
   </footer>
   {% endif %}
   <script>
@@ -226,7 +226,7 @@
 
    "list.html"
    "<section>
-  <h1>{{title|capitalize}} <a href=\"/{{lang}}/feed.xml\" aria-label=\"RSS feed\">🛜</a></h1>
+  <h1>{{title|capitalize}}{% if site.base-url|not-empty %} <a href=\"/{{lang}}/feed.xml\" aria-label=\"RSS feed\">🛜</a>{% endif %}</h1>
   <ul>
     {% for post in posts %}
     <li>
@@ -239,7 +239,7 @@
 
    "tag.html"
    "<section>
-  <h1>{{tag|capitalize}}</h1>
+  <h1>{{tag|capitalize}}{% if site.base-url|not-empty %} <a href=\"/{{lang}}/tags/{{tag}}/feed.xml\" aria-label=\"RSS feed\">🛜</a>{% endif %}</h1>
   <ul>
     {% for post in posts %}
     <li>
@@ -267,14 +267,14 @@
     <title>{{site.title}}</title>
     <link>{{site.base-url}}/{{lang}}/</link>
     <description>{{site.title}}</description>
-    <atom:link href=\"{{site.base-url}}/{{lang}}/feed.xml\" rel=\"self\" type=\"application/rss+xml\"/>
+    <atom:link href=\"{{feed-url}}\" rel=\"self\" type=\"application/rss+xml\"/>
     {% for post in posts %}
     <item>
       <title>{{post.title}}</title>
       <link>{{site.base-url}}{{post.url}}</link>
       <guid>{{site.base-url}}{{post.url}}</guid>
       {% if post.date %}<pubDate>{{post.rfc822-date}}</pubDate>{% endif %}
-      <description>{{post.summary}}</description>
+      <description><![CDATA[{{post.content}}]]></description>
     </item>
     {% endfor %}
   </channel>
@@ -422,12 +422,9 @@
          (str/join "\n"
                    (map (fn [item]
                           (str "<li>"
-                               (if (:term item)
-                                 (str "<dt>" (render-inline (:term item)) "</dt>"
-                                      "<dd>" (render-inline (:definition item)) "</dd>")
-                                 (str (render-inline (:content item))
-                                      (when-let [children (:children item)]
-                                        (str "\n" (render-children children)))))
+                               (render-inline (:content item))
+                               (when-let [children (:children item)]
+                                 (str "\n" (render-children children)))
                                "</li>"))
                         items))
          "\n</" tag ">")))
@@ -720,9 +717,12 @@
 (defn- render-post! [config post menu prev-post next-post]
   (let [lang      (:lang post)
         code-info (collect-code-langs (:ast post))
-        title     (if (:section post)
-                    (:title post)
-                    (str/capitalize (or (:title post) "")))
+        title     (let [t (or (:title post) "")]
+                    (if (:section post)
+                      t
+                      (if (seq t)
+                        (str (str/upper-case (subs t 0 1)) (subs t 1))
+                        t)))
         ctx       (merge (site-context config lang)
                          code-info
                          {:menu        menu
@@ -778,12 +778,10 @@
                              :content     (ast->html ast)})
             html     (render-page "post.html" ctx)]
         (write-file! (str *output-dir* "/" lang "/index.html") html))
-      (let [lang-posts (->> posts
-                            (filter #(= (:lang %) lang))
-                            (take 10))
-            ctx        (merge ctx
-                              {:title (:title config)
-                               :posts (map #(select-keys % [:title :date :url]) lang-posts)})
+      (let [recent (->> posts (take 10))
+            ctx    (merge ctx
+                          {:title (:title config)
+                           :posts (map #(select-keys % [:title :date :url]) recent)})
             html       (render-page "list.html" ctx)]
         (write-file! (str *output-dir* "/" lang "/index.html") html)))))
 
@@ -806,20 +804,33 @@
     (write-file! out html)))
 
 
-(defn- render-feed! [config lang posts]
-  (let [ctx {:site  config
-             :lang  lang
-             :posts (->> posts
-                         (take 20)
-                         (map (fn [p]
-                                {:title      (:title p)
-                                 :url        (:url p)
-                                 :date       (:date p)
-                                 :rfc822-date (iso->rfc822 (:date p))
-                                 :summary    (truncate (ast->text (:ast p)) 200)})))}
-        xml (render-template "feed.xml" ctx)
-        out (str *output-dir* "/" lang "/feed.xml")]
-    (write-file! out xml)))
+(defn- absolutize-urls
+  "Prefix relative URLs (href=\"/... or href=\"foo...) with base-url.
+   Skips already-absolute URLs (http://, https://, mailto:, #)."
+  [html base-url]
+  (-> html
+      (str/replace #"((?:href|src)=\")/" (str "$1" base-url "/"))
+      (str/replace #"((?:href|src)=\")(?!https?://|mailto:|#|/)" (str "$1" base-url "/"))))
+
+(defn- render-feed!
+  ([config lang posts]
+   (render-feed! config lang posts (str *output-dir* "/" lang "/feed.xml")))
+  ([config lang posts out-path]
+   (when-let [base (not-empty (:base-url config))]
+     (let [rel-path (str "/" (fs/relativize *output-dir* out-path))
+           ctx {:site     config
+                :lang     lang
+                :feed-url (str base rel-path)
+                :posts    (->> posts
+                               (take 10)
+                               (map (fn [p]
+                                      {:title      (:title p)
+                                       :url        (:url p)
+                                       :date       (:date p)
+                                       :rfc822-date (iso->rfc822 (:date p))
+                                       :content    (absolutize-urls (ast->html (:ast p)) base)})))}
+           xml (render-template "feed.xml" ctx)]
+       (write-file! out-path xml)))))
 
 (defn- render-search-index! [lang posts]
   (let [entries (map (fn [p]
@@ -832,13 +843,23 @@
 (defn- render-sitemap! [config posts langs]
   (let [base (:base-url config)]
     (when (seq base)
-      (let [entries (concat
+      (let [sections (->> posts (map (juxt :lang :section)) set)
+            all-tags (->> posts
+                          (mapcat (fn [p] (map #(vector (:lang p) %) (:tags p))))
+                          distinct)
+            entries (concat
                      ;; Language indexes
                      (map (fn [l] {:url (str base "/" l "/")}) langs)
                      ;; All posts
                      (map (fn [p] {:url (str base (:url p)) :date (:date p)}) posts)
+                     ;; Section indexes
+                     (->> sections
+                          (filter (fn [[_ s]] s))
+                          (map (fn [[l s]] {:url (str base "/" l "/" s "/")})))
                      ;; Tag indexes
-                     (map (fn [l] {:url (str base "/" l "/tags/")}) langs))
+                     (map (fn [l] {:url (str base "/" l "/tags/")}) langs)
+                     ;; Individual tag pages
+                     (map (fn [[l t]] {:url (str base "/" l "/tags/" t "/")}) all-tags))
             xml (str "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
                      "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n"
                      (str/join "\n"
@@ -889,17 +910,19 @@
         (let [lang-posts (filter #(= (:lang %) lang) posts)
               menu       (build-menu lang lang-posts sections langs config)]
 
-          ;; Render posts for this language (with prev/next links)
+          ;; Render posts for this language (with prev/next links within same section)
           ;; Posts are sorted newest-first: prev = newer, next = older
-          (let [posts-vec (vec lang-posts)]
-            (doseq [i (range (count posts-vec))]
-              (let [post (posts-vec i)]
-                (render-post! config post menu
-                              (when (:section post) (get posts-vec (dec i)))
-                              (when (:section post) (get posts-vec (inc i)))))))
+          (let [by-section (group-by :section lang-posts)]
+            (doseq [[section sec-posts] by-section]
+              (let [sec-vec (vec sec-posts)]
+                (doseq [i (range (count sec-vec))]
+                  (let [post (sec-vec i)]
+                    (render-post! config post menu
+                                  (when section (get sec-vec (dec i)))
+                                  (when section (get sec-vec (inc i)))))))))
 
           ;; Main index (from index file if present, else 10 latest posts)
-          (render-index! config lang posts (find-index-file lang) menu)
+          (render-index! config lang lang-posts (find-index-file lang) menu)
 
           ;; Section indexes
           (doseq [[section sec-posts] (group-by :section lang-posts)
@@ -910,9 +933,13 @@
           (let [tag-groups (->> lang-posts
                                 (mapcat (fn [p] (map #(vector % p) (:tags p))))
                                 (group-by first)
-                                (reduce-kv (fn [m tag pairs] (assoc m tag (map second pairs))) {}))]
+                                (reduce-kv (fn [m tag pairs]
+                                            (assoc m tag (sort-by :date (fn [a b] (compare (or b "") (or a "")))
+                                                                  (map second pairs)))) {}))]
             (doseq [[tag tag-posts] tag-groups]
-              (render-tag-page! config lang tag tag-posts menu))
+              (render-tag-page! config lang tag tag-posts menu)
+              (render-feed! config lang tag-posts
+                            (str *output-dir* "/" lang "/tags/" tag "/feed.xml")))
             (render-tags-index! config lang
                                 (->> tag-groups (map (fn [[tag ps]] [tag (count ps)])))
                                 menu))
@@ -956,8 +983,9 @@
                   path  (when line (second (str/split line #"\s+")))
                   fpath (str out-dir (if (str/ends-with? (or path "") "/")
                                       (str path "index.html")
-                                      path))]
-              (if (fs/exists? fpath)
+                                      path))
+                  fpath (str (fs/normalize fpath))]
+              (if (and (str/starts-with? fpath out-dir) (fs/exists? fpath))
                 (let [ctype (cond
                               (str/ends-with? fpath ".html") "text/html; charset=utf-8"
                               (str/ends-with? fpath ".css")  "text/css; charset=utf-8"
