@@ -1,3 +1,5 @@
+#!/usr/bin/env bb
+
 ;; Copyright (c) Bastien Guerry
 ;; SPDX-License-Identifier: EPL-2.0
 
@@ -116,12 +118,13 @@
     .search-results li a{display:block;padding:.5em .75em;text-decoration:none}
     .search-results li a:hover{background:var(--pico-primary-focus)}
     .search-results li time{font-size:.8em;opacity:.6;margin-left:.5em}
+    .visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   </style>
   {% if has-code %}<link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/styles/default.min.css\">{% endif %}
 </head>
 <body>
   <header class=\"container\">
-    <nav>
+    <nav aria-label=\"Main\">
       <ul>
         <li><h1><a href=\"/{{lang}}/\">{{site.title}}</a></h1></li>
       </ul>
@@ -130,8 +133,9 @@
         <li><a href=\"{{item.url}}\">{{item.name}}</a></li>
         {% endfor %}
         <li class=\"search-wrap\">
-          <input type=\"search\" id=\"search-input\" placeholder=\"\" autocomplete=\"off\">
-          <ul class=\"search-results\" id=\"search-results\"></ul>
+          <label for=\"search-input\" class=\"visually-hidden\">Search</label>
+          <input type=\"search\" id=\"search-input\" placeholder=\"\" autocomplete=\"off\" aria-controls=\"search-results\">
+          <ul class=\"search-results\" id=\"search-results\" role=\"listbox\" aria-label=\"Search results\"></ul>
         </li>
         <li><a href=\"#\" id=\"theme-toggle\" class=\"theme-toggle\" aria-label=\"Toggle theme\"><svg id=\"theme-icon\" xmlns=\"http://www.w3.org/2000/svg\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"5\"/><line x1=\"12\" y1=\"1\" x2=\"12\" y2=\"3\"/><line x1=\"12\" y1=\"21\" x2=\"12\" y2=\"23\"/><line x1=\"4.22\" y1=\"4.22\" x2=\"5.64\" y2=\"5.64\"/><line x1=\"18.36\" y1=\"18.36\" x2=\"19.78\" y2=\"19.78\"/><line x1=\"1\" y1=\"12\" x2=\"3\" y2=\"12\"/><line x1=\"21\" y1=\"12\" x2=\"23\" y2=\"12\"/><line x1=\"4.22\" y1=\"19.78\" x2=\"5.64\" y2=\"18.36\"/><line x1=\"18.36\" y1=\"5.64\" x2=\"19.78\" y2=\"4.22\"/></svg></a></li>
       </ul>
@@ -142,7 +146,7 @@
   </main>
   {% if site.copyright|not-empty %}
   <footer class=\"container\">
-    <p>{{site.copyright}}</p>
+    <p>{{site.copyright}} — Made with <a href=\"https://codeberg.org/bzg/orgy\">Orgy</a> — <a href=\"/{{lang}}/feed.xml\">RSS</a></p>
   </footer>
   {% endif %}
   <script>
@@ -163,7 +167,7 @@
                .slice(0,15);
       if(!hits.length){list.style.display='none';return;}
       list.innerHTML=hits.map(function(p){
-        return '<li><a href=\"'+esc(p.u)+'\">'+esc(p.t||'')
+        return '<li role=\"option\"><a href=\"'+esc(p.u)+'\">'+esc(p.t||'')
           +(p.d?'<time>'+esc(p.d)+'</time>':'')+'</a></li>';
       }).join('');
       list.style.display='block';
@@ -199,11 +203,11 @@
   {% if author %}<span class=\"author\">{{author}}</span>{% endif %}
   {% if date %}<time datetime=\"{{date}}\">{{date}}</time>{% endif %}
   {% if tags|not-empty %}
-  <nav class=\"tags\">
+  <nav class=\"tags\" aria-label=\"Tags\">
     {% for tag in tags %}
     <a href=\"/{{lang}}/tags/{{tag}}/\"><mark>{{tag}}</mark></a>
     {% endfor %}
-    <a href=\"/{{lang}}/tags/\" class=\"tags-clear\" title=\"All tags\">&times;</a>
+    <a href=\"/{{lang}}/tags/\" class=\"tags-clear\" aria-label=\"All tags\">&times;</a>
   </nav>
   {% endif %}
   </header>{% endif %}
@@ -212,7 +216,7 @@
   </section>
   {% if has-nav %}
   <footer>
-    <nav>
+    <nav aria-label=\"Adjacent posts\">
       {% if next %}<a href=\"{{next.url}}\">&larr; {{next.title}}</a>{% endif %}
       {% if prev %}<a href=\"{{prev.url}}\" style=\"margin-left:auto\">{{prev.title}} &rarr;</a>{% endif %}
     </nav>
@@ -222,7 +226,7 @@
 
    "list.html"
    "<section>
-  <h1>{{title|capitalize}}</h1>
+  <h1>{{title|capitalize}} <a href=\"/{{lang}}/feed.xml\" aria-label=\"RSS feed\">🛜</a></h1>
   <ul>
     {% for post in posts %}
     <li>
@@ -386,8 +390,11 @@
               :verbatim  (str "<code>" (escape-html (:value node)) "</code>")
               :link      (let [url (resolve-file-url node)]
                            (if (re-find image-ext-re url)
-                             (str "<img src=\"" (escape-html url) "\" alt=\""
-                                  (escape-html (or (organ/inline-text (:children node)) "")) "\">")
+                             (let [alt (or (organ/inline-text (:children node)) "")]
+                               (str "<img src=\"" (escape-html url) "\" alt=\""
+                                    (escape-html alt) "\""
+                                    (when (str/blank? alt) " role=\"presentation\"")
+                                    ">"))
                              (if (seq (:children node))
                                (str "<a href=\"" (escape-html url) "\">" (render-inline (:children node)) "</a>")
                                (str "<a href=\"" (escape-html url) "\">" (escape-html url) "</a>"))))
@@ -467,6 +474,7 @@
                             "")
                   extra (dissoc attrs :alt)]
               (str "<img src=\"" (escape-html url) "\" alt=\"" (escape-html alt) "\""
+                   (when (str/blank? alt) " role=\"presentation\"")
                    (str/join (map (fn [[k v]] (str " " (name k) "=\"" (escape-html v) "\"")) extra))
                    ">"))
             (str "<p" (or (html-attrs node) "") ">" (render-inline c) "</p>")))
@@ -1091,3 +1099,6 @@ Commands:
 
       :else
       (build! overrides))))
+
+(when (= *file* (System/getProperty "babashka.file"))
+  (apply -main *command-line-args*))
