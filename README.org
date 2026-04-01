@@ -1,5 +1,7 @@
 #+title: Orgy
 
+[[https://img.shields.io/badge/versioning-intver.org-blue.svg?style=for-the-badge]]
+
 A static blog generator that turns [[https://orgmode.org][Org mode]] files into a website.
 Powered by [[https://github.com/bzg/organ][organ]] and [[https://github.com/yogthos/Selmer][Selmer]], runs on [[https://babashka.org][Babashka]].
 
@@ -190,6 +192,14 @@ public/
 - Share any [[mailto:~bzg/orgology@lists.sr.ht][other question or idea]]
 
 You can also [[mailto:bzg@bzg.fr][send me an email]] and support my work on [[https://liberapay.com/bzg/][liberapay]].
+
+* Intentional Versioning
+
+This project uses [[https://intver.org][Intentional Versioning]], here are the three audiences:
+
+- =x= : end users who publish static website with orgy
+- =y= : external packagers
+- =z= : contributors to the codebase
 
 * Support the Clojure(script) ecosystem
 
