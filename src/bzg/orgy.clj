@@ -388,7 +388,7 @@
               :strike    (str "<del>" (render-inline (:children node)) "</del>")
               :code      (str "<code>" (escape-html (:value node)) "</code>")
               :verbatim  (str "<code>" (escape-html (:value node)) "</code>")
-              :link      (let [url (resolve-file-url node)]
+              :link      (let [url (or (resolve-file-url node) "")]
                            (if (re-find image-ext-re url)
                              (let [alt (or (organ/inline-text (:children node)) "")]
                                (str "<img src=\"" (escape-html url) "\" alt=\""
@@ -463,7 +463,7 @@
           (if (and attrs
                    (= 1 (count c))
                    (= :link (:type (first c)))
-                   (re-find image-ext-re (or (:target (first c)) (:url (first c)))))
+                   (re-find image-ext-re (or (:target (first c)) (:url (first c)) "")))
             (let [link  (first c)
                   url   (resolve-file-url link)
                   alt   (or (:alt attrs)
@@ -645,8 +645,8 @@
   "Load all org files from content root, excluding index files and ignored dirs."
   []
   (let [root *input-dir*]
-    (->> (concat (fs/glob root "*.org")
-                (fs/glob root "**/*.org"))
+    (->> (distinct (concat (fs/glob root "*.org")
+                          (fs/glob root "**/*.org")))
          (remove index-file?)
          (remove #(str/starts-with? (str (fs/file-name %)) "."))
          (remove #(in-ignored-dir? root %))
@@ -828,7 +828,8 @@
                                        :url        (:url p)
                                        :date       (:date p)
                                        :rfc822-date (iso->rfc822 (:date p))
-                                       :content    (absolutize-urls (ast->html (:ast p)) base)})))}
+                                       :content    (str/replace (absolutize-urls (ast->html (:ast p)) base)
+                                                                "]]>" "]]&gt;")})))}
            xml (render-template "feed.xml" ctx)]
        (write-file! out-path xml)))))
 
@@ -864,8 +865,8 @@
                      "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n"
                      (str/join "\n"
                                (map (fn [{:keys [url date]}]
-                                      (str "  <url>\n    <loc>" url "</loc>"
-                                           (when date (str "\n    <lastmod>" date "</lastmod>"))
+                                      (str "  <url>\n    <loc>" (escape-html url) "</loc>"
+                                           (when date (str "\n    <lastmod>" (escape-html date) "</lastmod>"))
                                            "\n  </url>"))
                                     entries))
                      "\n</urlset>")]
@@ -985,7 +986,7 @@
                                       (str path "index.html")
                                       path))
                   fpath (str (fs/normalize fpath))]
-              (if (and (str/starts-with? fpath out-dir) (fs/exists? fpath))
+              (if (and (str/starts-with? fpath (str out-dir "/")) (fs/exists? fpath))
                 (let [ctype (cond
                               (str/ends-with? fpath ".html") "text/html; charset=utf-8"
                               (str/ends-with? fpath ".css")  "text/css; charset=utf-8"
