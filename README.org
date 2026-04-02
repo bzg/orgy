@@ -197,9 +197,9 @@ You can also [[mailto:bzg@bzg.fr][send me an email]] and support my work on [[ht
 
 This project uses [[https://intver.org][Intentional Versioning]], here are the three audiences:
 
-- =x= : end users who publish static website with orgy
-- =y= : external packagers
-- =z= : contributors to the codebase
+- =Users= : end users who publish static website with orgy
+- =Integrators= : external packagers
+- =Maintainers= : maintainers of the codebase
 
 * Support the Clojure(script) ecosystem
 
