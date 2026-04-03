@@ -130,7 +130,7 @@
       </ul>
       <ul>
         {% for item in menu %}
-        <li><a href=\"{{item.url}}\">{{item.name}}</a></li>
+        <li><a href=\"{{item.url}}\">{{item.description}}</a></li>
         {% endfor %}
         <li class=\"search-wrap\">
           <label for=\"search-input\" class=\"visually-hidden\">Search</label>
@@ -660,39 +660,43 @@
 
 (defn- build-menu
   "Build nav menu for a given language.
-   If config has :menu, only root pages/sections whose slug matches an
-   entry in :menu are included (in :menu order). Otherwise all are shown."
+   :menu can be a vector (shared across languages) or a map keyed by language.
+   Only root pages/sections whose slug matches an entry are included (in order).
+   If :menu is absent, all root pages and sections are shown."
   [lang posts sections langs config]
-  (let [menu-filter (:menu config)
+  (let [menu-filter (let [m (:menu config)]
+                      (cond (vector? m) m
+                            (map? m)    (get m (keyword lang) (get m lang))
+                            :else       nil))
         ;; Root-level pages (no section, not index files) for this language
         root-pages (->> posts
                         (filter #(and (= (:lang %) lang) (nil? (:section %))))
-                        (map (fn [p] {:name (or (:title p) (:slug p)) :url (:url p) :slug (:slug p)})))
+                        (map (fn [p] {:url (:url p) :description (or (:title p) (:slug p)) :slug (:slug p)})))
         ;; Section links
         sec-links  (->> sections
                         (filter (fn [[l s]] (and (= l lang) s)))
-                        (map (fn [[_ s]] {:name (str/capitalize s)
-                                          :url  (str "/" lang "/" s "/")
+                        (map (fn [[_ s]] {:url  (str "/" lang "/" s "/")
+                                          :description (str/capitalize s)
                                           :slug s})))
         ;; Filter and order by :menu config, or show all
-        ;; Entries can be slugs (strings) or direct links ({:name "X" :url "Y"})
+        ;; Entries can be slugs (strings) or direct links ({:url "Y" :description "X"})
         page-links (if menu-filter
                      (let [by-slug (into {} (map (fn [p] [(:slug p) p])
                                                  (concat root-pages sec-links)))]
                        (->> menu-filter
                             (keep #(if (map? %)
-                                     (select-keys % [:name :url])
+                                     (select-keys % [:url :description])
                                      (get by-slug %)))
                             vec))
-                     (vec (concat root-pages (sort-by :name sec-links))))
+                     (vec (concat root-pages (sort-by :description sec-links))))
         ;; Strip :slug before returning
         page-links (mapv #(dissoc % :slug) page-links)
         ;; Tags link
-        tags-link  [{:name "Tags" :url (str "/" lang "/tags/")}]
+        tags-link  [{:url (str "/" lang "/tags/") :description "Tags"}]
         ;; Other language links
         lang-links (->> langs
                         (remove #(= % lang))
-                        (map (fn [l] {:name (str/upper-case l) :url (str "/" l "/")})))]
+                        (map (fn [l] {:url (str "/" l "/") :description (str/upper-case l)})))]
     (vec (concat page-links tags-link lang-links))))
 
 (defn- site-context [config lang]
@@ -1030,8 +1034,10 @@
 
  ;; Menu entries: list of slugs or direct links to show in nav.
  ;; Matches root-level pages and section directories. Displayed in this order.
+ ;; Can be a vector (same menu for all languages) or a map keyed by language.
  ;; If omitted, all root pages and sections are shown.
- ;; :menu [\"notes\" \"about\" {:name \"GitHub\" :url \"https://github.com/me\"}]
+ ;; :menu [\"notes\" \"about\" {:url \"https://github.com/me\" :description \"GitHub\"}]
+ ;; :menu {:en [\"notes\" \"about\"] :fr [\"notes\" \"a-propos\"]}
 
  ;; Optional CSS theme, loaded after Pico 2.
  ;; Can be: a pico-themes name (e.g. \"teletype\"), an https:// URL,
@@ -1081,11 +1087,12 @@
           (if-let [v (first more)]
             (recur (rest more) (assoc opts :config-path v) positional)
             (throw (ex-info "Missing value for -c/--config" {})))
+          ("-C" "--config-write") (assoc opts :config-write true :positional positional)
           ("-h" "--help") (assoc opts :help true :positional positional)
           (recur more opts (conj positional a)))))))
 
 (defn -main [& args]
-  (let [{:keys [help input-dir output-dir config-path theme positional]} (parse-args args)
+  (let [{:keys [help config-write input-dir output-dir config-path theme positional]} (parse-args args)
         overrides (cond-> {}
                     input-dir   (assoc :input-dir input-dir)
                     output-dir  (assoc :output-dir output-dir)
@@ -1100,6 +1107,7 @@ Options:
   -i, --input-dir DIR   Input directory containing org files (required)
   -o, --output-dir DIR  Output directory (default: ./public)
   -c, --config FILE     Path to config.edn (default: input-dir or working dir)
+  -C, --config-write    Write a default config.edn in the current directory
   -t, --theme VALUE     CSS theme: name (pico-themes), https:// URL,
                         file:/// URL, or path to a .css file
 
@@ -1109,6 +1117,10 @@ Commands:
   init             Export templates and config for customization
   clean            Remove the output directory
   help             Show this help")
+
+      config-write
+      (let [path (str (or input-dir ".") "/config.edn")]
+        (write-if-absent! path default-config "config.edn"))
 
       (= cmd "serve")
       (serve! {:port (if-let [p (second positional)]

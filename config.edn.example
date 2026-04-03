@@ -1,5 +1,5 @@
 {;; Site title (default: name of the current directory).
- :title     "My Blog"
+ :title     "My website"
 
  ;; Base URL for absolute links (RSS, etc.). No trailing slash.
  :base-url  "https://example.com"
@@ -14,8 +14,11 @@
 
  ;; Menu entries: list of slugs (filenames without lang/ext) to show in nav.
  ;; Matches root-level pages and section directories. Displayed in this order.
+ ;; Entries can also be maps for external links: {:url "https://github.com/me" :description "GitHub"}
+ ;; Can be a vector (same menu for all languages) or a map keyed by language.
  ;; If omitted, all root pages and sections are shown.
- ;; :menu ["about" "notes" "talks"]
+ ;; :menu ["about" "notes" {:url "https://codeberg.org/me" :description "Code"}]
+ ;; :menu {:en ["notes" "about"] :fr ["notes" "a-propos"]}
 
  ;; Optional CSS theme, loaded after Pico 2.
  ;; Can be: a pico-themes name (e.g. "teletype"), an https:// URL,
