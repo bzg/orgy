@@ -352,7 +352,7 @@
 
 (def ^:private image-ext-re #"\.(?:png|jpg|jpeg|gif|svg|webp)$")
 
-(def ^:private ignored-dirs
+(def ^:dynamic ^:private *ignored-dirs*
   "Directories to skip when scanning for content."
   #{"static" "public" "templates" ".git"})
 
@@ -626,8 +626,8 @@
     {:title   (:title meta)
      :draft   (= "true" (some-> (:draft meta) str/trim str/lower-case))
      :date    (when-let [d (:date meta)]
-               ;; Normalize Org timestamps like <2019-03-28 jeu.> to 2019-03-28
-               (or (second (re-find #"(\d{4}-\d{2}-\d{2})" d)) d))
+                ;; Normalize Org timestamps like <2019-03-28 jeu.> to 2019-03-28
+                (or (second (re-find #"(\d{4}-\d{2}-\d{2})" d)) d))
      :author  (:author meta)
      :tags    tags
      :lang    lang
@@ -639,14 +639,14 @@
 
 (defn- in-ignored-dir? [root path]
   (let [rel (str (fs/relativize root path))]
-    (some #(str/starts-with? rel (str % "/")) ignored-dirs)))
+    (some #(str/starts-with? rel (str % "/")) *ignored-dirs*)))
 
 (defn- load-posts
   "Load all org files from content root, excluding index files and ignored dirs."
   []
   (let [root *input-dir*]
     (->> (distinct (concat (fs/glob root "*.org")
-                          (fs/glob root "**/*.org")))
+                           (fs/glob root "**/*.org")))
          (filter #(fs/regular-file? %))
          (remove index-file?)
          (remove #(str/starts-with? (str (fs/file-name %)) "."))
@@ -900,75 +900,77 @@
 
 (defn build!
   "Build the static site."
-  [{:keys [input-dir output-dir] :as overrides}]
+  [{:keys [input-dir output-dir skip-dirs] :as overrides}]
   (binding [*input-dir*  (str (fs/absolutize (or input-dir ".")))
             *output-dir* (str (fs/absolutize (or output-dir "public")))]
-    (let [config   (load-config (dissoc overrides :input-dir :output-dir))
-          posts    (load-posts)
-          sections (->> posts (map (juxt :lang :section)) set)
-          langs    (distinct (concat (:languages config) (map :lang posts)))]
-      (println (str "Building " (count posts) " posts..."))
+    (let [config   (load-config (dissoc overrides :input-dir :output-dir :skip-dirs))
+          extra    (into (set skip-dirs) (:skip-dirs config))]
+      (binding [*ignored-dirs* (into *ignored-dirs* extra)]
+        (let [posts    (load-posts)
+              sections (->> posts (map (juxt :lang :section)) set)
+              langs    (distinct (concat (:languages config) (map :lang posts)))]
+          (println (str "Building " (count posts) " posts..."))
 
-      ;; Per-language indexes and posts
-      (doseq [lang langs]
-        (let [lang-posts (filter #(= (:lang %) lang) posts)
-              menu       (build-menu lang lang-posts sections langs config)]
+          ;; Per-language indexes and posts
+          (doseq [lang langs]
+            (let [lang-posts (filter #(= (:lang %) lang) posts)
+                  menu       (build-menu lang lang-posts sections langs config)]
 
-          ;; Render posts for this language (with prev/next links within same section)
-          ;; Posts are sorted newest-first: prev = newer, next = older
-          (let [by-section (group-by :section lang-posts)]
-            (doseq [[section sec-posts] by-section]
-              (let [sec-vec (vec sec-posts)]
-                (doseq [i (range (count sec-vec))]
-                  (let [post (sec-vec i)]
-                    (render-post! config post menu
-                                  (when section (get sec-vec (dec i)))
-                                  (when section (get sec-vec (inc i)))))))))
+              ;; Render posts for this language (with prev/next links within same section)
+              ;; Posts are sorted newest-first: prev = newer, next = older
+              (let [by-section (group-by :section lang-posts)]
+                (doseq [[section sec-posts] by-section]
+                  (let [sec-vec (vec sec-posts)]
+                    (doseq [i (range (count sec-vec))]
+                      (let [post (sec-vec i)]
+                        (render-post! config post menu
+                                      (when section (get sec-vec (dec i)))
+                                      (when section (get sec-vec (inc i)))))))))
 
-          ;; Main index (from index file if present, else 10 latest posts)
-          (render-index! config lang lang-posts (find-index-file lang) menu)
+              ;; Main index (from index file if present, else 10 latest posts)
+              (render-index! config lang lang-posts (find-index-file lang) menu)
 
-          ;; Section indexes
-          (doseq [[section sec-posts] (group-by :section lang-posts)
-                  :when section]
-            (render-list! config lang section sec-posts menu))
+              ;; Section indexes
+              (doseq [[section sec-posts] (group-by :section lang-posts)
+                      :when section]
+                (render-list! config lang section sec-posts menu))
 
-          ;; Tag pages
-          (let [tag-groups (->> lang-posts
-                                (mapcat (fn [p] (map #(vector % p) (:tags p))))
-                                (group-by first)
-                                (reduce-kv (fn [m tag pairs]
-                                            (assoc m tag (sort-by :date (fn [a b] (compare (or b "") (or a "")))
-                                                                  (map second pairs)))) {}))]
-            (doseq [[tag tag-posts] tag-groups]
-              (render-tag-page! config lang tag tag-posts menu)
-              (render-feed! config lang tag-posts
-                            (str *output-dir* "/" lang "/tags/" tag "/feed.xml")))
-            (render-tags-index! config lang
-                                (->> tag-groups (map (fn [[tag ps]] [tag (count ps)])))
-                                menu))
+              ;; Tag pages
+              (let [tag-groups (->> lang-posts
+                                    (mapcat (fn [p] (map #(vector % p) (:tags p))))
+                                    (group-by first)
+                                    (reduce-kv (fn [m tag pairs]
+                                                 (assoc m tag (sort-by :date (fn [a b] (compare (or b "") (or a "")))
+                                                                       (map second pairs)))) {}))]
+                (doseq [[tag tag-posts] tag-groups]
+                  (render-tag-page! config lang tag tag-posts menu)
+                  (render-feed! config lang tag-posts
+                                (str *output-dir* "/" lang "/tags/" tag "/feed.xml")))
+                (render-tags-index! config lang
+                                    (->> tag-groups (map (fn [[tag ps]] [tag (count ps)])))
+                                    menu))
 
-          ;; RSS feed
-          (render-feed! config lang lang-posts)
+              ;; RSS feed
+              (render-feed! config lang lang-posts)
 
-          ;; Search index
-          (render-search-index! lang lang-posts)))
+              ;; Search index
+              (render-search-index! lang lang-posts)))
 
-      ;; Root index: redirect to first language
-      (write-file! (str *output-dir* "/index.html")
-                   (str "<!DOCTYPE html><html><head>"
-                        "<meta http-equiv=\"refresh\" content=\"0;url=/"
-                        (first langs) "/\">"
-                        "</head><body></body></html>"))
+          ;; Root index: redirect to first language
+          (write-file! (str *output-dir* "/index.html")
+                       (str "<!DOCTYPE html><html><head>"
+                            "<meta http-equiv=\"refresh\" content=\"0;url=/"
+                            (first langs) "/\">"
+                            "</head><body></body></html>"))
 
-      ;; Sitemap
-      (render-sitemap! config posts langs)
+          ;; Sitemap
+          (render-sitemap! config posts langs)
 
-      ;; Copy static assets and non-org files from content tree
-      (copy-static!)
-      (copy-assets!)
+          ;; Copy static assets and non-org files from content tree
+          (copy-static!)
+          (copy-assets!)
 
-      (println (str "Site built in " *output-dir* " (" (count posts) " posts)")))))
+          (println (str "Site built in " *output-dir* " (" (count posts) " posts)")))))))
 
 (defn serve!
   "Build and start a simple HTTP server."
@@ -986,8 +988,8 @@
                   line  (.readLine in)
                   path  (when line (second (str/split line #"\s+")))
                   fpath (str out-dir (if (str/ends-with? (or path "") "/")
-                                      (str path "index.html")
-                                      path))
+                                       (str path "index.html")
+                                       path))
                   fpath (str (fs/normalize fpath))]
               (if (and (str/starts-with? fpath (str out-dir "/")) (fs/exists? fpath))
                 (let [ctype (cond
@@ -1082,21 +1084,26 @@
           (if-let [v (first more)]
             (recur (rest more) (assoc opts :output-dir v) positional)
             (throw (ex-info "Missing value for -o/--output-dir" {})))
+          ("-s" "--skip-dirs")
+          (if-let [v (first more)]
+            (recur (rest more) (assoc opts :skip-dirs (str/split v #",")) positional)
+            (throw (ex-info "Missing value for -s/--skip-dirs" {})))
           ("-c" "--config")
           (if-let [v (first more)]
             (recur (rest more) (assoc opts :config-path v) positional)
             (throw (ex-info "Missing value for -c/--config" {})))
-          ("-C" "--config-write") (assoc opts :config-write true :positional positional)
-          ("-h" "--help") (assoc opts :help true :positional positional)
+          ("-C" "--config-write") (recur more (assoc opts :config-write true) positional)
+          ("-h" "--help") (recur more (assoc opts :help true) positional)
           (recur more opts (conj positional a)))))))
 
 (defn -main [& args]
-  (let [{:keys [help config-write input-dir output-dir config-path theme positional]} (parse-args args)
+  (let [{:keys [help config-write input-dir output-dir config-path theme skip-dirs positional]} (parse-args args)
         overrides (cond-> {}
                     input-dir   (assoc :input-dir input-dir)
                     output-dir  (assoc :output-dir output-dir)
                     config-path (assoc :config-path config-path)
-                    theme       (assoc :theme theme))
+                    theme       (assoc :theme theme)
+                    skip-dirs   (assoc :skip-dirs skip-dirs))
         cmd       (first positional)]
     (cond
       (or help (= cmd "help"))
@@ -1107,6 +1114,7 @@ Options:
   -o, --output-dir DIR  Output directory (default: ./public)
   -c, --config FILE     Path to config.edn (default: input-dir or working dir)
   -C, --config-write    Write a default config.edn in the current directory
+  -s, --skip-dirs DIRS  Comma-separated directories to skip (e.g. drafts,old)
   -t, --theme VALUE     CSS theme: name (pico-themes), https:// URL,
                         file:/// URL, or path to a .css file
 
