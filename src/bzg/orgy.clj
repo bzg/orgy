@@ -647,6 +647,7 @@
   (let [root *input-dir*]
     (->> (distinct (concat (fs/glob root "*.org")
                           (fs/glob root "**/*.org")))
+         (filter #(fs/regular-file? %))
          (remove index-file?)
          (remove #(str/starts-with? (str (fs/file-name %)) "."))
          (remove #(in-ignored-dir? root %))
@@ -900,9 +901,7 @@
 (defn build!
   "Build the static site."
   [{:keys [input-dir output-dir] :as overrides}]
-  (when-not input-dir
-    (throw (ex-info "Input directory is required (-i/--input-dir)" {})))
-  (binding [*input-dir*  (str (fs/absolutize input-dir))
+  (binding [*input-dir*  (str (fs/absolutize (or input-dir ".")))
             *output-dir* (str (fs/absolutize (or output-dir "public")))]
     (let [config   (load-config (dissoc overrides :input-dir :output-dir))
           posts    (load-posts)
@@ -1101,10 +1100,10 @@
         cmd       (first positional)]
     (cond
       (or help (= cmd "help"))
-      (println "Usage: orgy -i DIR [options] [command]
+      (println "Usage: orgy [options] [command]
 
 Options:
-  -i, --input-dir DIR   Input directory containing org files (required)
+  -i, --input-dir DIR   Input directory containing org files (default: .)
   -o, --output-dir DIR  Output directory (default: ./public)
   -c, --config FILE     Path to config.edn (default: input-dir or working dir)
   -C, --config-write    Write a default config.edn in the current directory
@@ -1129,9 +1128,7 @@ Commands:
                :overrides overrides})
 
       (= cmd "init")
-      (if input-dir
-        (init! input-dir)
-        (println "Error: -i/--input-dir is required"))
+      (init! (or input-dir "."))
 
       (= cmd "clean")
       (let [dir (or output-dir "public")]
