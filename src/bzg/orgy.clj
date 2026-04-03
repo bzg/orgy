@@ -97,7 +97,6 @@
     body>footer{text-align:center}
     iframe{width:100%;aspect-ratio:4/3;display:block;margin:1em auto;border:none}
     article img{display:block;margin:1em auto;max-width:90%}
-    time{padding:.125em .375em;border-radius:4px;background:color-mix(in srgb,var(--pico-background-color) 85%,var(--pico-color));color:color-mix(in srgb,var(--pico-color) 65%,var(--pico-background-color))}
     article>header{display:flex;flex-wrap:wrap;align-items:baseline;gap:.5em}
     article>header h1{flex:1;margin:0}
     article>header .tags{margin-left:auto;display:flex;gap:.35em}
