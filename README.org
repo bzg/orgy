@@ -7,17 +7,21 @@ Powered by [[https://github.com/bzg/organ][organ]] and [[https://github.com/yogt
 
 * Features
 
-- Org files parsed to HTML via organ (inline markup, code blocks, tables, lists, ...)
-- Multi-language support: =post.fr.org= and =post.en.org= produce separate indexes and RSS feeds
-- Tag pages and tag index
+- Org files parsed to HTML via organ (inline markup, code blocks,
+  tables, lists, ...)
 - Content sections: subdirectories become categories with their own index
-- Client-side search
-- Syntax highlighting via [[https://highlightjs.org][highlight.js]] (loaded only on pages with code)
-- SEO: meta description, Open Graph tags, canonical URLs, =sitemap.xml=
-- Customisable CSS theme (pico-themes name, URL, or local file)
+- Automatic monolingual/multilingual detection: files go to
+  =public/slug/= by default, or =public/en/slug/= when multiple languages
+  are detected. =post.fr.org= and =post.en.org= produce separate indexes
+  and RSS feeds
+- Tag pages and tag index
+- Client-side quick search (opt-in via =:quick-search true=)
+- Light/dark theme toggle (opt-in via =:theme-toggle true=)
 - Configurable navigation menu with support for direct links
 - Draft support (=#+draft: true= excludes a file from export)
-- Override any template via =orgy -i DIR init=
+- SEO: meta description, Open Graph tags, canonical URLs, =sitemap.xml=
+- Customisable CSS theme (pico-themes name, URL, or local file)
+- Syntax highlighting via [[https://highlightjs.org][highlight.js]] (loaded only on pages with code)
 
 * Requirements
 
@@ -26,11 +30,14 @@ Powered by [[https://github.com/bzg/organ][organ]] and [[https://github.com/yogt
 * Quick start
 
 #+begin_src shell
+# Build the current directory as a website in public/
+orgy
+
+# Build myblog as a website in ./public
+orgy -i myblog
+
 # Initialize config and templates (optional)
 orgy -i myblog init
-
-# Build
-orgy -i myblog
 
 # Build and serve locally
 orgy -i myblog serve
@@ -39,7 +46,7 @@ orgy -i myblog serve
 orgy help
 #+end_src
 
-* Directory layout
+* Example directory layout
 
 #+begin_example
 myblog/
@@ -60,9 +67,10 @@ myblog/
 - *Sections*: any subdirectory (except =static/=, =templates/=, =public/=,
   =.git/=) is a section with its own index page.
 - *Static assets*: =static/= contents are copied to the output root.
-  Non-org files elsewhere in the tree are also copied, preserving paths.
-- *Language detection*: =post.fr.org= → French, =post.en.org= → English.
-  No suffix defaults to ="en"=.
+  Non-org files elsewhere in the tree are also copied, preserving
+  paths.
+- *Language detection*: from filename suffix (=post.fr.org= → French) or
+  =#+language:= header. No suffix and no header defaults to ="en"=.
 - *Index pages*: =index.{lang}.org= or =_index.{lang}.org= at the root
   renders as the homepage for that language.
 
@@ -74,7 +82,8 @@ Each =.org= file supports these headers:
 #+title: My Post Title
 #+date: 2026-03-28
 #+author: Author Name
-#+tags[]: emacs org-mode
+#+language: fr
+#+tags: emacs org-mode
 #+draft: true
 #+end_example
 
@@ -85,12 +94,13 @@ filename as label).
 * CLI
 
 #+begin_example
-Usage: orgy -i DIR [options] [command]
+Usage: orgy [options] [command]
 
 Options:
-  -i, --input-dir DIR   Input directory containing org files (required)
+  -i, --input-dir DIR   Input directory containing org files (default: .)
   -o, --output-dir DIR  Output directory (default: ./public)
   -c, --config FILE     Path to config.edn (default: input-dir or working dir)
+  -s, --skip-dirs DIRS  Comma-separated directories to skip (e.g. drafts,old)
   -t, --theme VALUE     CSS theme (see examples below)
 
 Commands:
@@ -121,14 +131,16 @@ orgy -i myblog -t ./themes/custom.css
 
 All keys in =config.edn= are optional:
 
-| Key          | Default        | Description                                       |
-|--------------+----------------+---------------------------------------------------|
-| =:title=     | directory name | Site title                                        |
-| =:base-url=  | =""=           | Base URL for absolute links (RSS, sitemap, etc.)  |
-| =:copyright= | =""=           | Footer copyright notice                           |
-| =:languages= | =["en"]=       | Languages to generate indexes and feeds for       |
-| =:menu=      | /all/          | Ordered list of nav entries (see below)            |
-| =:theme=     | /none/         | CSS theme (name, URL, or path — see CLI section)  |
+| Key           | Default        | Description                                      |
+|---------------+----------------+--------------------------------------------------|
+| =:title=        | directory name | Site title                                       |
+| =:base-url=     | =""=             | Base URL for absolute links (RSS, sitemap, etc.) |
+| =:copyright=    | =""=             | Footer copyright notice                          |
+| =:languages=    | =["en"]=         | Languages to generate indexes and feeds for      |
+| =:menu=         | /all/            | Ordered list of nav entries (see below)          |
+| =:theme=        | /none/           | CSS theme (name, URL, or path — see CLI section) |
+| =:quick-search= | =false=          | Enable client-side quick search                  |
+| =:theme-toggle= | =false=          | Show a light/dark theme toggle in the nav bar    |
 
 ** Menu configuration
 
@@ -136,13 +148,13 @@ When =:menu= is omitted, all root-level pages and sections appear in the
 nav. To control what appears and in what order:
 
 #+begin_src clojure
-:menu ["notes"                                          ;; section by slug
-       "about"                                          ;; root page by slug
-       {:name "GitHub" :url "https://github.com/me"}]   ;; direct link
+:menu ["notes"                                                    ;; section by slug
+       "about"                                                    ;; root page by slug
+       {:url "https://github.com/me" :description "GitHub"}]      ;; direct link
 #+end_src
 
-A "Tags" link and language switcher links are always appended after the
-menu entries.
+A "Tags" link is always appended after the menu entries.  In
+multilingual mode, language switcher links are also appended.
 
 * Templates
 
@@ -158,9 +170,38 @@ Run =orgy -i DIR init= to export all default templates into
 
 Templates use [[https://github.com/yogthos/Selmer][Selmer]] syntax. Template variables include =title=,
 =date=, =tags=, =content=, =lang=, =menu=, =site.title=, =site.copyright=,
-=description=, =canonical=, =has-code=, =hl-langs=, =theme-link=, and =theme-inline=.
+=description=, =canonical=, =has-code=, =hl-langs=, =lang-prefix=, =theme-link=, and =theme-inline=.
 
 * Output structure
+
+** Monolingual (default)
+
+When no multilingual indicator is detected (no =:languages= with multiple
+entries, no =:menu= map, no =.xx.org= file suffixes, no distinct
+=#+language:= headers), pages are generated directly under =public/=:
+
+#+begin_example
+public/
+  index.html              # homepage
+  feed.xml                # RSS feed
+  search.json             # search index (when :quick-search is true)
+  sitemap.xml             # generated when base-url is set
+  notes/
+    index.html            # section listing
+    my-post/
+      index.html          # post
+  tags/
+    index.html            # all tags
+    emacs/
+      index.html          # posts tagged "emacs"
+  img/                    # from static/
+  favicon.ico             # from static/
+#+end_example
+
+** Multilingual
+
+When multiple languages are detected, each language gets its own subtree
+and a root =index.html= redirects to the first language:
 
 #+begin_example
 public/
@@ -169,7 +210,7 @@ public/
   en/
     index.html            # homepage
     feed.xml              # RSS feed
-    search.json           # search index
+    search.json           # search index (when :quick-search is true)
     notes/
       index.html          # section listing
       my-post/
@@ -210,4 +251,6 @@ donating to [[https://clojuriststogether.org][clojuriststogether.org]].
 
 Copyright © 2026 Bastien Guerry
 
-Distributed under the Eclipse Public License 2.0.
+The Clojure code is distributed under the Eclipse Public License 2.0
+and the Javascript code is distributed under the Mozilla Public
+License 2.0.

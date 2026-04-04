@@ -17,6 +17,7 @@
 
 (def ^:dynamic *input-dir* ".")
 (def ^:dynamic *output-dir* "public")
+(def ^:dynamic *monolingual* false)
 
 ;; ---------------------------------------------------------------------------
 ;; Configuration
@@ -53,20 +54,22 @@
       (throw (ex-info (str "Invalid --theme value: " value) {})))))
 
 (defn- load-config [overrides]
-  (let [cfg-path (or (:config-path overrides)
-                     (let [p (str *input-dir* "/config.edn")]
-                       (when (fs/exists? p) (str p))))
-        cfg   (when cfg-path
-                (-> cfg-path slurp clojure.edn/read-string))
-        title (or (:title cfg) (-> *input-dir* fs/absolutize fs/file-name str))]
-    (let [theme-val (or (:theme overrides) (:theme cfg))]
-      (merge {:title     title
-              :base-url  (str/replace (or (:base-url cfg) "") #"/$" "")
-              :copyright (or (:copyright cfg) "")
-              :resolved-theme (resolve-css-theme theme-val)
-              :languages (or (:languages cfg) ["en"])
-              :menu      (:menu cfg)}
-             (dissoc overrides :config-path :theme)))))
+  (let [cfg-path  (or (:config-path overrides)
+                      (let [p (str *input-dir* "/config.edn")]
+                        (when (fs/exists? p) (str p))))
+        cfg       (when cfg-path
+                    (-> cfg-path slurp clojure.edn/read-string))
+        title     (or (:title cfg) (-> *input-dir* fs/absolutize fs/file-name str (str/replace "_" " ")))
+        theme-val (or (:theme overrides) (:theme cfg))]
+    (merge {:title          title
+            :base-url       (str/replace (or (:base-url cfg) "") #"/$" "")
+            :copyright      (or (:copyright cfg) "")
+            :resolved-theme (resolve-css-theme theme-val)
+            :languages      (or (:languages cfg) ["en"])
+            :quick-search   (:quick-search cfg)
+            :theme-toggle   (:theme-toggle cfg)
+            :menu           (:menu cfg)}
+           (dissoc overrides :config-path :theme))))
 
 ;; ---------------------------------------------------------------------------
 ;; Default templates (used when templates/ dir is absent)
@@ -89,7 +92,7 @@
   <link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css\">
   {% if theme-link %}<link rel=\"stylesheet\" href=\"{{theme-link}}\">{% endif %}
   {% if theme-inline %}<style>{{theme-inline|safe}}</style>{% endif %}
-  {% if site.base-url|not-empty %}<link rel=\"alternate\" type=\"application/rss+xml\" title=\"{{site.title}} ({{lang}})\" href=\"/{{lang}}/feed.xml\">{% endif %}
+  {% if site.base-url|not-empty %}<link rel=\"alternate\" type=\"application/rss+xml\" title=\"{{site.title}} ({{lang}})\" href=\"{{lang-prefix}}/feed.xml\">{% endif %}
   <link rel=\"sitemap\" type=\"application/xml\" href=\"/sitemap.xml\">
   <style>
     .container{max-width:1080px}
@@ -105,19 +108,19 @@
     .tags-clear{text-decoration:none;opacity:.4;font-size:1.1em}
     .tags-clear:hover{opacity:1}
     article>footer nav{display:flex;justify-content:space-between;margin-top:2em;padding-top:1em;border-top:1px solid var(--pico-muted-border-color)}
-    .search-wrap{position:relative}
+    {% if site.quick-search %}.search-wrap{position:relative}{% endif %}
     nav h1{margin:0;font-size:1.5rem;font-family:inherit}
     article h2{font-size:1.3rem}
     article h3{font-size:1.15rem}
     article h4{font-size:1.05rem}
     article h5,article h6{font-size:1rem}
-    #search-input{margin-bottom:0;padding:.25rem .5rem;height:auto;font-size:.875rem;width:10rem;background-image:none}
-    .theme-toggle{background:none;border:none;padding:.25rem;line-height:1;cursor:pointer;color:var(--pico-color)}
-    .search-results{position:absolute;right:0;top:100%;background:var(--pico-background-color);border:1px solid var(--pico-muted-border-color);border-radius:4px;max-height:60vh;overflow-y:auto;width:320px;z-index:10;display:none;margin-top:.25em;padding:0;list-style:none}
+    {% if site.quick-search %}#search-input{margin-bottom:0;padding:.25rem .5rem;height:auto;font-size:.875rem;width:10rem;background-image:none}{% endif %}
+    {% if site.theme-toggle %}.theme-toggle{background:none;border:none;padding:.25rem;line-height:1;cursor:pointer;color:var(--pico-color)}{% endif %}
+    {% if site.quick-search %}.search-results{position:absolute;right:0;top:100%;background:var(--pico-background-color);border:1px solid var(--pico-muted-border-color);border-radius:4px;max-height:60vh;overflow-y:auto;width:320px;z-index:10;display:none;margin-top:.25em;padding:0;list-style:none}
     .search-results li a{display:block;padding:.5em .75em;text-decoration:none}
     .search-results li a:hover{background:var(--pico-primary-focus)}
     .search-results li time{font-size:.8em;opacity:.6;margin-left:.5em}
-    .visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+    .visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}{% endif %}
   </style>
   {% if has-code %}<link rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/styles/default.min.css\">{% endif %}
 </head>
@@ -125,18 +128,18 @@
   <header class=\"container\">
     <nav aria-label=\"Main\">
       <ul>
-        <li><h1><a href=\"/{{lang}}/\">{{site.title}}</a></h1></li>
+        <li><h1><a href=\"{{lang-prefix}}/\">{{site.title}}</a></h1></li>
       </ul>
       <ul>
         {% for item in menu %}
         <li><a href=\"{{item.url}}\">{{item.description}}</a></li>
         {% endfor %}
-        <li class=\"search-wrap\">
+        {% if site.quick-search %}<li class=\"search-wrap\">
           <label for=\"search-input\" class=\"visually-hidden\">Search</label>
           <input type=\"search\" id=\"search-input\" placeholder=\"\" autocomplete=\"off\" aria-controls=\"search-results\">
           <ul class=\"search-results\" id=\"search-results\" role=\"listbox\" aria-label=\"Search results\"></ul>
-        </li>
-        <li><a href=\"#\" id=\"theme-toggle\" class=\"theme-toggle\" aria-label=\"Toggle theme\"><svg id=\"theme-icon\" xmlns=\"http://www.w3.org/2000/svg\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"5\"/><line x1=\"12\" y1=\"1\" x2=\"12\" y2=\"3\"/><line x1=\"12\" y1=\"21\" x2=\"12\" y2=\"23\"/><line x1=\"4.22\" y1=\"4.22\" x2=\"5.64\" y2=\"5.64\"/><line x1=\"18.36\" y1=\"18.36\" x2=\"19.78\" y2=\"19.78\"/><line x1=\"1\" y1=\"12\" x2=\"3\" y2=\"12\"/><line x1=\"21\" y1=\"12\" x2=\"23\" y2=\"12\"/><line x1=\"4.22\" y1=\"19.78\" x2=\"5.64\" y2=\"18.36\"/><line x1=\"18.36\" y1=\"5.64\" x2=\"19.78\" y2=\"4.22\"/></svg></a></li>
+        </li>{% endif %}
+        {% if site.theme-toggle %}<li><a href=\"#\" id=\"theme-toggle\" class=\"theme-toggle\" aria-label=\"Toggle theme\"><svg id=\"theme-icon\" xmlns=\"http://www.w3.org/2000/svg\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"5\"/><line x1=\"12\" y1=\"1\" x2=\"12\" y2=\"3\"/><line x1=\"12\" y1=\"21\" x2=\"12\" y2=\"23\"/><line x1=\"4.22\" y1=\"4.22\" x2=\"5.64\" y2=\"5.64\"/><line x1=\"18.36\" y1=\"18.36\" x2=\"19.78\" y2=\"19.78\"/><line x1=\"1\" y1=\"12\" x2=\"3\" y2=\"12\"/><line x1=\"21\" y1=\"12\" x2=\"23\" y2=\"12\"/><line x1=\"4.22\" y1=\"19.78\" x2=\"5.64\" y2=\"18.36\"/><line x1=\"18.36\" y1=\"5.64\" x2=\"19.78\" y2=\"4.22\"/></svg></a></li>{% endif %}
       </ul>
     </nav>
   </header>
@@ -145,18 +148,19 @@
   </main>
   {% if site.copyright|not-empty %}
   <footer class=\"container\">
-    <p>{{site.copyright}} — Made with <a href=\"https://codeberg.org/bzg/orgy\">Orgy</a>{% if site.base-url|not-empty %} — <a href=\"/{{lang}}/feed.xml\">RSS</a>{% endif %}</p>
+    <p>{{site.copyright}} — Made with <a href=\"https://codeberg.org/bzg/orgy\">Orgy</a>{% if site.base-url|not-empty %} — <a href=\"{{lang-prefix}}/feed.xml\">RSS</a>{% endif %}</p>
   </footer>
   {% endif %}
-  <script>
+  {% if site.quick-search %}<script>
+  // @license magnet:?xt=urn:btih:3877d6d54b3accd4bc32f8a48bf32ebc0901502a&dn=mpl-2.0.txt MPL-2.0
   (function(){
     var input=document.getElementById('search-input'),
         list=document.getElementById('search-results'),
-        idx=null,lang='{{lang}}';
+        idx=null;
     function esc(s){var d=document.createElement('div');d.textContent=s;return d.innerHTML;}
     function load(cb){
       if(idx)return cb();
-      fetch('/'+lang+'/search.json').then(function(r){return r.json()})
+      fetch('{{lang-prefix}}/search.json').then(function(r){return r.json()})
         .then(function(d){idx=d;cb()});
     }
     function render(q){
@@ -178,6 +182,10 @@
       if(!e.target.closest('.search-wrap'))list.style.display='none';
     });
   })();
+  // @license-end
+  </script>{% endif %}
+  {% if site.theme-toggle %}<script>
+  // @license magnet:?xt=urn:btih:3877d6d54b3accd4bc32f8a48bf32ebc0901502a&dn=mpl-2.0.txt MPL-2.0
   (function(){
     var sun='<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"12\" cy=\"12\" r=\"5\"/><line x1=\"12\" y1=\"1\" x2=\"12\" y2=\"3\"/><line x1=\"12\" y1=\"21\" x2=\"12\" y2=\"23\"/><line x1=\"4.22\" y1=\"4.22\" x2=\"5.64\" y2=\"5.64\"/><line x1=\"18.36\" y1=\"18.36\" x2=\"19.78\" y2=\"19.78\"/><line x1=\"1\" y1=\"12\" x2=\"3\" y2=\"12\"/><line x1=\"21\" y1=\"12\" x2=\"23\" y2=\"12\"/><line x1=\"4.22\" y1=\"19.78\" x2=\"5.64\" y2=\"18.36\"/><line x1=\"18.36\" y1=\"5.64\" x2=\"19.78\" y2=\"4.22\"/></svg>',
         moon='<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z\"/></svg>',
@@ -189,10 +197,12 @@
     apply(theme);
     btn.addEventListener('click',function(e){e.preventDefault();apply(root.getAttribute('data-theme')==='dark'?'light':'dark');});
   })();
-  </script>
+  // @license-end
+  </script>{% endif %}
   {% if has-code %}<script src=\"https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/highlight.min.js\"></script>
   {% for hl-lang in hl-langs %}<script src=\"https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11/build/languages/{{hl-lang}}.min.js\"></script>
-  {% endfor %}<script>hljs.highlightAll();</script>{% endif %}
+  {% endfor %}<script>// @license magnet:?xt=urn:btih:3877d6d54b3accd4bc32f8a48bf32ebc0901502a&dn=mpl-2.0.txt MPL-2.0
+  hljs.highlightAll();// @license-end</script>{% endif %}
 </body>
 </html>"
 
@@ -204,9 +214,9 @@
   {% if tags|not-empty %}
   <nav class=\"tags\" aria-label=\"Tags\">
     {% for tag in tags %}
-    <a href=\"/{{lang}}/tags/{{tag}}/\"><mark>{{tag}}</mark></a>
+    <a href=\"{{lang-prefix}}/tags/{{tag}}/\"><mark>{{tag}}</mark></a>
     {% endfor %}
-    <a href=\"/{{lang}}/tags/\" class=\"tags-clear\" aria-label=\"All tags\">&times;</a>
+    <a href=\"{{lang-prefix}}/tags/\" class=\"tags-clear\" aria-label=\"All tags\">&times;</a>
   </nav>
   {% endif %}
   </header>{% endif %}
@@ -225,7 +235,7 @@
 
    "list.html"
    "<section>
-  <h1>{{title|capitalize}}{% if site.base-url|not-empty %} <a href=\"/{{lang}}/feed.xml\" aria-label=\"RSS feed\">🛜</a>{% endif %}</h1>
+  <h1>{{title|capitalize}}{% if site.base-url|not-empty %} <a href=\"{{lang-prefix}}/feed.xml\" aria-label=\"RSS feed\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1em\" height=\"1em\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" style=\"vertical-align:-.125em\"><circle cx=\"5\" cy=\"19\" r=\"2\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M4 11a9 9 0 0 1 9 9\"/><path d=\"M4 4a16 16 0 0 1 16 16\"/></svg></a>{% endif %}</h1>
   <ul>
     {% for post in posts %}
     <li>
@@ -238,7 +248,7 @@
 
    "tag.html"
    "<section>
-  <h1>{{tag|capitalize}}{% if site.base-url|not-empty %} <a href=\"/{{lang}}/tags/{{tag}}/feed.xml\" aria-label=\"RSS feed\">🛜</a>{% endif %}</h1>
+  <h1>{{tag|capitalize}}{% if site.base-url|not-empty %} <a href=\"{{lang-prefix}}/tags/{{tag}}/feed.xml\" aria-label=\"RSS feed\"><svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1em\" height=\"1em\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" style=\"vertical-align:-.125em\"><circle cx=\"5\" cy=\"19\" r=\"2\" fill=\"currentColor\" stroke=\"none\"/><path d=\"M4 11a9 9 0 0 1 9 9\"/><path d=\"M4 4a16 16 0 0 1 16 16\"/></svg></a>{% endif %}</h1>
   <ul>
     {% for post in posts %}
     <li>
@@ -254,7 +264,7 @@
   <h1>Tags</h1>
   <ul>
     {% for entry in tags %}
-    <li><a href=\"/{{lang}}/tags/{{entry.tag}}/\">{{entry.tag}}</a> ({{entry.count}})</li>
+    <li><a href=\"{{lang-prefix}}/tags/{{entry.tag}}/\">{{entry.tag}}</a> ({{entry.count}})</li>
     {% endfor %}
   </ul>
 </section>"
@@ -264,7 +274,7 @@
 <rss version=\"2.0\" xmlns:atom=\"http://www.w3.org/2005/Atom\">
   <channel>
     <title>{{site.title}}</title>
-    <link>{{site.base-url}}/{{lang}}/</link>
+    <link>{{site.base-url}}{{lang-prefix}}/</link>
     <description>{{site.title}}</description>
     <atom:link href=\"{{feed-url}}\" rel=\"self\" type=\"application/rss+xml\"/>
     {% for post in posts %}
@@ -577,9 +587,9 @@
 ;; ---------------------------------------------------------------------------
 
 (defn- parse-tags-header
-  "Parse #+tags: tag1 tag2 or #+tags[]: tag1 tag2 into a vector."
+  "Parse #+tags: tag1 tag2 into a vector."
   [org-text]
-  (when-let [[_ tags] (re-find #"(?m)^#\+tags(?:\[\])?:\s*(.+)$" org-text)]
+  (when-let [[_ tags] (re-find #"(?m)^#\+tags:\s*(.+)$" org-text)]
     (str/split (str/trim tags) #"\s+")))
 
 (defn- file-lang
@@ -588,6 +598,11 @@
   (let [name (str (fs/file-name path))]
     (when-let [[_ lang] (re-matches #".*\.(\w{2})\.org$" name)]
       lang)))
+
+(defn- lang-prefix
+  "Return \"/{lang}\" in multilingual mode, \"\" in monolingual mode."
+  [lang]
+  (if *monolingual* "" (str "/" lang)))
 
 (defn- file-slug
   "Extract slug from filename: some-post.fr.org → \"some-post\", post.org → \"post\"."
@@ -609,21 +624,35 @@
   (let [name (str (fs/file-name path))]
     (re-matches #"_?index(?:\.\w{2})?\.org" name)))
 
-(defn- load-post
-  "Parse a single org file into a post map."
+(defn- prescan-org-file
+  "Read an org file and extract lightweight metadata via regex.
+   The file text is not retained — only :path, :lang, :tags, :draft?."
   [path]
   (let [org-text (slurp (str path))
+        lang    (or (file-lang path)
+                    (second (re-find #"(?m)^#\+language:\s*(\S+)" org-text))
+                    "en")
+        tags    (or (parse-tags-header org-text) [])
+        draft?  (boolean (re-find #"(?mi)^#\+draft:\s*true\s*$" org-text))]
+    {:path   (str path)
+     :lang   lang
+     :tags   tags
+     :draft? draft?}))
+
+(defn- load-post
+  "Parse a pre-scanned org file into a full post map.
+   Re-reads the file for organ parsing; prescan metadata avoids redundant extraction."
+  [scanned]
+  (let [{:keys [path lang tags]} scanned
+        org-text (slurp path)
         ast      (organ/parse-org org-text)
         meta     (:meta ast)
-        lang     (or (file-lang path) "en")
         slug     (file-slug path)
         section  (file-section path)
-        tags     (or (parse-tags-header org-text) [])
         url      (if section
-                   (str "/" lang "/" section "/" slug "/")
-                   (str "/" lang "/" slug "/"))]
+                   (str (lang-prefix lang) "/" section "/" slug "/")
+                   (str (lang-prefix lang) "/" slug "/"))]
     {:title   (:title meta)
-     :draft   (= "true" (some-> (:draft meta) str/trim str/lower-case))
      :date    (when-let [d (:date meta)]
                 ;; Normalize Org timestamps like <2019-03-28 jeu.> to 2019-03-28
                 (or (second (re-find #"(\d{4}-\d{2}-\d{2})" d)) d))
@@ -634,25 +663,31 @@
      :section section
      :url     url
      :ast     ast
-     :path    (str path)}))
+     :path    path}))
 
 (defn- in-ignored-dir? [root path]
   (let [rel (str (fs/relativize root path))]
     (some #(str/starts-with? rel (str % "/")) *ignored-dirs*)))
 
-(defn- load-posts
-  "Load all org files from content root, excluding index files and ignored dirs."
+(defn- list-org-files
+  "List all org files from content root, excluding hidden/ignored dirs."
   []
   (let [root *input-dir*]
     (->> (distinct (concat (fs/glob root "*.org")
                            (fs/glob root "**/*.org")))
          (filter #(fs/regular-file? %))
-         (remove index-file?)
          (remove #(str/starts-with? (str (fs/file-name %)) "."))
-         (remove #(in-ignored-dir? root %))
-         (map load-post)
-         (remove :draft)
-         (sort-by :date (fn [a b] (compare (or b "") (or a "")))))))
+         (remove #(in-ignored-dir? root %)))))
+
+(defn- load-posts
+  "Parse pre-scanned org files into post maps, excluding drafts.
+   Expects output of prescan-org-file."
+  [scanned-files]
+  (->> scanned-files
+       (remove #(index-file? (:path %)))
+       (remove :draft?)
+       (map load-post)
+       (sort-by :date (fn [a b] (compare (or b "") (or a ""))))))
 
 ;; ---------------------------------------------------------------------------
 ;; Site generation
@@ -675,7 +710,7 @@
         ;; Section links
         sec-links  (->> sections
                         (filter (fn [[l s]] (and (= l lang) s)))
-                        (map (fn [[_ s]] {:url  (str "/" lang "/" s "/")
+                        (map (fn [[_ s]] {:url  (str (lang-prefix lang) "/" s "/")
                                           :description (str/capitalize s)
                                           :slug s})))
         ;; Filter and order by :menu config, or show all
@@ -691,18 +726,22 @@
                      (vec (concat root-pages (sort-by :description sec-links))))
         ;; Strip :slug before returning
         page-links (mapv #(dissoc % :slug) page-links)
-        ;; Tags link
-        tags-link  [{:url (str "/" lang "/tags/") :description "Tags"}]
-        ;; Other language links
-        lang-links (->> langs
-                        (remove #(= % lang))
-                        (map (fn [l] {:url (str "/" l "/") :description (str/upper-case l)})))]
+        ;; Tags link (only when posts have tags)
+        has-tags?  (some (comp seq :tags) posts)
+        tags-link  (when has-tags?
+                     [{:url (str (lang-prefix lang) "/tags/") :description "Tags"}])
+        ;; Other language links (only in multilingual mode)
+        lang-links (when-not *monolingual*
+                     (->> langs
+                          (remove #(= % lang))
+                          (map (fn [l] {:url (str "/" l "/") :description (str/upper-case l)}))))]
     (vec (concat page-links tags-link lang-links))))
 
 (defn- site-context [config lang]
   (let [{:keys [link inline]} (:resolved-theme config)]
     {:site         config
      :lang         lang
+     :lang-prefix  (lang-prefix lang)
      :theme-link   link
      :theme-inline inline}))
 
@@ -751,9 +790,10 @@
                       :title title
                       :posts (map #(select-keys % [:title :date :url]) posts)})
         html  (render-page "list.html" ctx)
+        lp    (lang-prefix lang)
         out   (if section
-                (str *output-dir* "/" lang "/" section "/index.html")
-                (str *output-dir* "/" lang "/index.html"))]
+                (str *output-dir* lp "/" section "/index.html")
+                (str *output-dir* lp "/index.html"))]
     (write-file! out html)))
 
 (defn- find-index-file
@@ -768,7 +808,8 @@
            (str root "/index.org")])))
 
 (defn- render-index! [config lang posts index-file menu]
-  (let [lang-url (str "/" lang "/")
+  (let [lp       (lang-prefix lang)
+        lang-url (str lp "/")
         ctx (merge (site-context config lang)
                    {:menu menu :canonical (canonical-url config lang-url)})]
     (if index-file
@@ -781,13 +822,13 @@
                              :description (truncate (ast->text ast) 160)
                              :content     (ast->html ast)})
             html     (render-page "post.html" ctx)]
-        (write-file! (str *output-dir* "/" lang "/index.html") html))
+        (write-file! (str *output-dir* lp "/index.html") html))
       (let [recent (->> posts (take 10))
             ctx    (merge ctx
                           {:title (:title config)
                            :posts (map #(select-keys % [:title :date :url]) recent)})
             html       (render-page "list.html" ctx)]
-        (write-file! (str *output-dir* "/" lang "/index.html") html)))))
+        (write-file! (str *output-dir* lp "/index.html") html)))))
 
 (defn- render-tag-page! [config lang tag posts menu]
   (let [ctx  (merge (site-context config lang)
@@ -795,7 +836,7 @@
                      :tag   tag
                      :posts (map #(select-keys % [:title :date :url]) posts)})
         html (render-page "tag.html" ctx)
-        out  (str *output-dir* "/" lang "/tags/" tag "/index.html")]
+        out  (str *output-dir* (lang-prefix lang) "/tags/" tag "/index.html")]
     (write-file! out html)))
 
 (defn- render-tags-index! [config lang tag-counts menu]
@@ -804,7 +845,7 @@
                      :tags (map (fn [[tag count]] {:tag tag :count count})
                                 (sort-by first tag-counts))})
         html (render-page "tags-index.html" ctx)
-        out  (str *output-dir* "/" lang "/tags/index.html")]
+        out  (str *output-dir* (lang-prefix lang) "/tags/index.html")]
     (write-file! out html)))
 
 
@@ -818,7 +859,7 @@
 
 (defn- render-feed!
   ([config lang posts]
-   (render-feed! config lang posts (str *output-dir* "/" lang "/feed.xml")))
+   (render-feed! config lang posts (str *output-dir* (lang-prefix lang) "/feed.xml")))
   ([config lang posts out-path]
    (when-let [base (not-empty (:base-url config))]
      (let [rel-path (str "/" (fs/relativize *output-dir* out-path))
@@ -842,7 +883,7 @@
                        {:t (:title p) :u (:url p) :d (:date p)
                         :b (truncate (ast->text (:ast p)) 500)})
                      posts)
-        out     (str *output-dir* "/" lang "/search.json")]
+        out     (str *output-dir* (lang-prefix lang) "/search.json")]
     (write-file! out (json/generate-string entries))))
 
 (defn- render-sitemap! [config posts langs]
@@ -854,17 +895,17 @@
                           distinct)
             entries (concat
                      ;; Language indexes
-                     (map (fn [l] {:url (str base "/" l "/")}) langs)
+                     (map (fn [l] {:url (str base (lang-prefix l) "/")}) langs)
                      ;; All posts
                      (map (fn [p] {:url (str base (:url p)) :date (:date p)}) posts)
                      ;; Section indexes
                      (->> sections
                           (filter (fn [[_ s]] s))
-                          (map (fn [[l s]] {:url (str base "/" l "/" s "/")})))
+                          (map (fn [[l s]] {:url (str base (lang-prefix l) "/" s "/")})))
                      ;; Tag indexes
-                     (map (fn [l] {:url (str base "/" l "/tags/")}) langs)
+                     (map (fn [l] {:url (str base (lang-prefix l) "/tags/")}) langs)
                      ;; Individual tag pages
-                     (map (fn [[l t]] {:url (str base "/" l "/tags/" t "/")}) all-tags))
+                     (map (fn [[l t]] {:url (str base (lang-prefix l) "/tags/" t "/")}) all-tags))
             xml (str "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
                      "<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n"
                      (str/join "\n"
@@ -897,6 +938,14 @@
           (fs/create-dirs (fs/parent dest))
           (fs/copy file dest {:replace-existing true}))))))
 
+(defn- detect-monolingual?
+  "Return true when there is no indication of multiple languages.
+   Uses pre-scanned metadata to avoid re-reading files."
+  [config scanned-files]
+  (and (<= (count (:languages config)) 1)
+       (not (map? (:menu config)))
+       (<= (count (distinct (map :lang scanned-files))) 1)))
+
 (defn build!
   "Build the static site."
   [{:keys [input-dir output-dir skip-dirs] :as overrides}]
@@ -905,10 +954,15 @@
     (let [config   (load-config (dissoc overrides :input-dir :output-dir :skip-dirs))
           extra    (into (set skip-dirs) (:skip-dirs config))]
       (binding [*ignored-dirs* (into *ignored-dirs* extra)]
-        (let [posts    (load-posts)
-              sections (->> posts (map (juxt :lang :section)) set)
-              langs    (distinct (concat (:languages config) (map :lang posts)))]
-          (println (str "Building " (count posts) " posts..."))
+        (let [scanned  (map prescan-org-file (list-org-files))
+              mono?    (detect-monolingual? config scanned)]
+          (binding [*monolingual* mono?]
+            (let [live     (remove :draft? scanned)
+                  n-pages  (count live)
+                  posts    (load-posts scanned)
+                  sections (->> posts (map (juxt :lang :section)) set)
+                  langs    (distinct (concat (:languages config) (map :lang posts)))]
+          (println (str "Building " n-pages " page" (when (> n-pages 1) "s") "..."))
 
           ;; Per-language indexes and posts
           (doseq [lang langs]
@@ -934,33 +988,36 @@
                       :when section]
                 (render-list! config lang section sec-posts menu))
 
-              ;; Tag pages
+              ;; Tag pages (only when posts have tags)
               (let [tag-groups (->> lang-posts
                                     (mapcat (fn [p] (map #(vector % p) (:tags p))))
                                     (group-by first)
                                     (reduce-kv (fn [m tag pairs]
                                                  (assoc m tag (sort-by :date (fn [a b] (compare (or b "") (or a "")))
                                                                        (map second pairs)))) {}))]
-                (doseq [[tag tag-posts] tag-groups]
-                  (render-tag-page! config lang tag tag-posts menu)
-                  (render-feed! config lang tag-posts
-                                (str *output-dir* "/" lang "/tags/" tag "/feed.xml")))
-                (render-tags-index! config lang
-                                    (->> tag-groups (map (fn [[tag ps]] [tag (count ps)])))
-                                    menu))
+                (when (seq tag-groups)
+                  (doseq [[tag tag-posts] tag-groups]
+                    (render-tag-page! config lang tag tag-posts menu)
+                    (render-feed! config lang tag-posts
+                                  (str *output-dir* (lang-prefix lang) "/tags/" tag "/feed.xml")))
+                  (render-tags-index! config lang
+                                      (->> tag-groups (map (fn [[tag ps]] [tag (count ps)])))
+                                      menu)))
 
               ;; RSS feed
               (render-feed! config lang lang-posts)
 
               ;; Search index
-              (render-search-index! lang lang-posts)))
+              (when (:quick-search config)
+                (render-search-index! lang lang-posts))))
 
-          ;; Root index: redirect to first language
-          (write-file! (str *output-dir* "/index.html")
-                       (str "<!DOCTYPE html><html><head>"
-                            "<meta http-equiv=\"refresh\" content=\"0;url=/"
-                            (first langs) "/\">"
-                            "</head><body></body></html>"))
+          ;; Root index: redirect to first language (only in multilingual mode)
+          (when-not *monolingual*
+            (write-file! (str *output-dir* "/index.html")
+                         (str "<!DOCTYPE html><html><head>"
+                              "<meta http-equiv=\"refresh\" content=\"0;url=/"
+                              (first langs) "/\">"
+                              "</head><body></body></html>")))
 
           ;; Sitemap
           (render-sitemap! config posts langs)
@@ -969,7 +1026,7 @@
           (copy-static!)
           (copy-assets!)
 
-          (println (str "Site built in " *output-dir* " (" (count posts) " posts)")))))))
+          (println (str "Site built in " *output-dir* " (" n-pages " page" (when (> n-pages 1) "s") ")")))))))))
 
 (defn serve!
   "Build and start a simple HTTP server."
@@ -1028,8 +1085,8 @@
  :copyright \"© 2026 Author\"
 
  ;; Languages to generate indexes and feeds for (default: [\"en\"]).
- ;; Language is detected from filenames: post.fr.org → \"fr\", post.en.org → \"en\".
- ;; Files without a language suffix default to \"en\".
+ ;; Language is detected from filenames (post.fr.org → \"fr\") or #+language: header.
+ ;; Files without a language suffix or header default to \"en\".
  :languages [\"en\"]
 
  ;; Menu entries: list of slugs or direct links to show in nav.
