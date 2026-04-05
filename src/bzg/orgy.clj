@@ -100,9 +100,9 @@
     body>footer{text-align:center}
     iframe{width:100%;aspect-ratio:4/3;display:block;margin:1em auto;border:none}
     article img{display:block;margin:1em auto;max-width:90%}
-    article>header{display:flex;flex-wrap:wrap;align-items:baseline;gap:.5em}
-    article>header h1{flex:1;margin:0}
-    article>header .tags{margin-left:auto;display:flex;gap:.35em}
+    article>header h1{margin:0 0 .25em}
+    article>header .post-meta{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:flex-end;gap:.5em}
+    article>header .tags{display:flex;gap:.35em}
     article>header .tags a{text-decoration:none}
     article>header .tags mark{font-size:.85em}
     .tags-clear{text-decoration:none;opacity:.4;font-size:1.1em}
@@ -209,6 +209,7 @@
    "post.html"
    "<article>
   {% if title %}<header><h1>{{title}}</h1>
+  <div class=\"post-meta\">
   {% if author %}<span class=\"author\">{{author}}</span>{% endif %}
   {% if date %}<time datetime=\"{{date}}\">{{date}}</time>{% endif %}
   {% if tags|not-empty %}
@@ -219,6 +220,7 @@
     <a href=\"{{lang-prefix}}/tags/\" class=\"tags-clear\" aria-label=\"All tags\">&times;</a>
   </nav>
   {% endif %}
+  </div>
   </header>{% endif %}
   <section>
     {{content|safe}}
