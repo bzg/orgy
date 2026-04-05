@@ -706,7 +706,7 @@
         ;; Root-level pages (no section, not index files) for this language
         root-pages (->> posts
                         (filter #(and (= (:lang %) lang) (nil? (:section %))))
-                        (map (fn [p] {:url (:url p) :description (or (:title p) (:slug p)) :slug (:slug p)})))
+                        (map (fn [p] {:url (:url p) :description (or (:title p) (str/capitalize (:slug p))) :slug (:slug p)})))
         ;; Section links
         sec-links  (->> sections
                         (filter (fn [[l s]] (and (= l lang) s)))
