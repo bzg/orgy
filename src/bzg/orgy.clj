@@ -331,7 +331,7 @@
   [ast]
   (letfn [(walk [acc node]
             (let [acc (if (= :src-block (:type node))
-                        (if-let [l (:language node)]
+                        (if-let [l (some-> (:language node) str/lower-case)]
                           (conj acc (get hljs-lang-map l l))
                           acc)
                         acc)]
@@ -513,7 +513,7 @@
              (render-children (:children node)))))
 
     :src-block
-    (let [lang (some-> (:language node) (as-> l (get hljs-lang-map l l)))]
+    (let [lang (some-> (:language node) str/lower-case (as-> l (get hljs-lang-map l l)))]
       (str "<pre><code"
            (when lang (str " class=\"language-" lang "\""))
            ">"
@@ -524,7 +524,8 @@
     (str "<blockquote>" (render-children (:children node)) "</blockquote>")
 
     :block
-    (if (and (= :export (:block-type node)) (= "html" (:args node)))
+    (if (and (= :export (:block-type node))
+             (= "html" (some-> (:args node) str/lower-case)))
       (:content node)
       (str "<pre>" (escape-html (:content node)) "</pre>"))
 
