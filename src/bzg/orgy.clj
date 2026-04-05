@@ -353,10 +353,24 @@
       (str/replace "\"" "&quot;")))
 
 (defn- resolve-file-url
-  "For file: links, strip the prefix and rewrite static/ paths."
+  "For file: links, rewrite .org targets to their HTML URL and static/ paths."
   [node]
   (if (= :file (:link-type node))
-    (str/replace-first (:target node) #"^static/" "/")
+    (let [target (:target node)]
+      (if (str/ends-with? target ".org")
+        ;; Convert file:path/to/post.en.org → /{lang}/section/slug/
+        ;; Inline extraction to avoid forward-reference to file-slug etc.
+        (let [fname   (fs/file-name (fs/path target))
+              slug    (or (second (re-matches #"(.+?)\.\w{2}\.org$" (str fname)))
+                          (second (re-matches #"(.+?)\.org$" (str fname))))
+              lang    (or (second (re-matches #".*\.(\w{2})\.org$" (str fname))) "en")
+              parts   (str/split target #"/")
+              section (when (> (count parts) 1) (first parts))
+              lp      (if *monolingual* "" (str "/" lang))]
+          (if section
+            (str lp "/" section "/" slug "/")
+            (str lp "/" slug "/")))
+        (str/replace-first target #"^static/" "/")))
     (:url node)))
 
 (def ^:private image-ext-re #"\.(?:png|jpg|jpeg|gif|svg|webp)$")
