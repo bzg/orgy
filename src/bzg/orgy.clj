@@ -1028,51 +1028,88 @@
 
           (println (str "Site built in " *output-dir* " (" n-pages " page" (when (> n-pages 1) "s") ")")))))))))
 
+(defn- source-fingerprint
+  "Return a map of path→last-modified-ms for all source files under input-dir,
+   excluding output-dir and .git/."
+  [input-dir output-dir]
+  (let [out-abs (str (fs/absolutize output-dir) "/")
+        git-dir (str (fs/absolutize input-dir) "/.git/")]
+    (->> (concat (fs/glob input-dir "**/*") (fs/glob input-dir "*"))
+         (filter fs/regular-file?)
+         (remove #(let [abs (str (fs/absolutize %))]
+                    (or (str/starts-with? abs out-abs)
+                        (str/starts-with? abs git-dir))))
+         (remove #(str/starts-with? (str (fs/file-name %)) "."))
+         (reduce (fn [m f] (assoc m (str f) (.toMillis (fs/last-modified-time f)))) {}))))
+
+(defn- watch-and-rebuild!
+  "Poll for source changes every `interval-ms` and rebuild when detected."
+  [opts input-dir output-dir interval-ms]
+  (let [fp (atom (source-fingerprint input-dir output-dir))]
+    (while true
+      (Thread/sleep interval-ms)
+      (let [fp' (source-fingerprint input-dir output-dir)]
+        (when (not= @fp fp')
+          (println "\nChange detected, rebuilding...")
+          (try (build! opts)
+               (catch Exception e
+                 (println (str "Build error: " (.getMessage e)))))
+          (reset! fp fp'))))))
+
 (defn serve!
-  "Build and start a simple HTTP server."
+  "Build, start a simple HTTP server, and watch for file changes."
   [{:keys [port overrides] :or {port 1888}}]
   (let [opts    (or overrides {})
         out-dir (str (fs/absolutize (or (:output-dir opts) "public")))]
     (build! opts)
     (println (str "Serving at http://localhost:" port))
+    (println "Watching for changes... (Ctrl+C to stop)")
+    ;; HTTP server in a daemon thread
     (let [server (java.net.ServerSocket. port)]
-      (loop []
-        (try
-          (with-open [socket (.accept server)]
-            (let [out   (.getOutputStream socket)
-                  in    (java.io.BufferedReader. (java.io.InputStreamReader. (.getInputStream socket)))
-                  line  (.readLine in)
-                  path  (when line (second (str/split line #"\s+")))
-                  fpath (str out-dir (if (str/ends-with? (or path "") "/")
-                                       (str path "index.html")
-                                       path))
-                  fpath (str (fs/normalize fpath))]
-              (if (and (str/starts-with? fpath (str out-dir "/")) (fs/exists? fpath))
-                (let [ctype (cond
-                              (str/ends-with? fpath ".html") "text/html; charset=utf-8"
-                              (str/ends-with? fpath ".css")  "text/css; charset=utf-8"
-                              (str/ends-with? fpath ".xml")  "application/xml; charset=utf-8"
-                              (str/ends-with? fpath ".json") "application/json; charset=utf-8"
-                              (str/ends-with? fpath ".js")   "text/javascript; charset=utf-8"
-                              (str/ends-with? fpath ".png")  "image/png"
-                              (str/ends-with? fpath ".jpg")  "image/jpeg"
-                              (str/ends-with? fpath ".jpeg") "image/jpeg"
-                              (str/ends-with? fpath ".gif")  "image/gif"
-                              (str/ends-with? fpath ".svg")  "image/svg+xml"
-                              (str/ends-with? fpath ".webp") "image/webp"
-                              (str/ends-with? fpath ".ico")  "image/x-icon"
-                              (str/ends-with? fpath ".pdf")  "application/pdf"
-                              :else "application/octet-stream")
-                      body   (java.nio.file.Files/readAllBytes (java.nio.file.Path/of fpath (into-array String [])))
-                      header (.getBytes (str "HTTP/1.1 200 OK\r\nContent-Type: " ctype "\r\nContent-Length: " (count body) "\r\n\r\n"))]
-                  (.write out header)
-                  (.write out body)
-                  (.flush out))
-                (let [resp "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\n\r\nNot found"]
-                  (.write out (.getBytes resp))
-                  (.flush out)))))
-          (catch Exception _))
-        (recur)))))
+      (doto (Thread.
+              (fn []
+                (loop []
+                  (try
+                    (with-open [socket (.accept server)]
+                      (let [out   (.getOutputStream socket)
+                            in    (java.io.BufferedReader. (java.io.InputStreamReader. (.getInputStream socket)))
+                            line  (.readLine in)
+                            path  (when line (second (str/split line #"\s+")))
+                            fpath (str out-dir (if (str/ends-with? (or path "") "/")
+                                                 (str path "index.html")
+                                                 path))
+                            fpath (str (fs/normalize fpath))]
+                        (if (and (str/starts-with? fpath (str out-dir "/")) (fs/exists? fpath))
+                          (let [ctype (cond
+                                        (str/ends-with? fpath ".html") "text/html; charset=utf-8"
+                                        (str/ends-with? fpath ".css")  "text/css; charset=utf-8"
+                                        (str/ends-with? fpath ".xml")  "application/xml; charset=utf-8"
+                                        (str/ends-with? fpath ".json") "application/json; charset=utf-8"
+                                        (str/ends-with? fpath ".js")   "text/javascript; charset=utf-8"
+                                        (str/ends-with? fpath ".png")  "image/png"
+                                        (str/ends-with? fpath ".jpg")  "image/jpeg"
+                                        (str/ends-with? fpath ".jpeg") "image/jpeg"
+                                        (str/ends-with? fpath ".gif")  "image/gif"
+                                        (str/ends-with? fpath ".svg")  "image/svg+xml"
+                                        (str/ends-with? fpath ".webp") "image/webp"
+                                        (str/ends-with? fpath ".ico")  "image/x-icon"
+                                        (str/ends-with? fpath ".pdf")  "application/pdf"
+                                        :else "application/octet-stream")
+                                body   (java.nio.file.Files/readAllBytes (java.nio.file.Path/of fpath (into-array String [])))
+                                header (.getBytes (str "HTTP/1.1 200 OK\r\nContent-Type: " ctype "\r\nContent-Length: " (count body) "\r\n\r\n"))]
+                            (.write out header)
+                            (.write out body)
+                            (.flush out))
+                          (let [resp "HTTP/1.1 404 Not Found\r\nContent-Type: text/plain\r\n\r\nNot found"]
+                            (.write out (.getBytes resp))
+                            (.flush out)))))
+                    (catch Exception _))
+                  (recur))))
+        (.setDaemon true)
+        (.start))
+      ;; Watcher runs on main thread (blocks until Ctrl+C)
+      (let [in-dir (str (fs/absolutize (or (:input-dir opts) ".")))]
+        (watch-and-rebuild! opts in-dir out-dir 500)))))
 
 (def ^:private default-config
   "{;; Site title (default: name of the current directory).
