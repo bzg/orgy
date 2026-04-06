@@ -100,6 +100,15 @@
     body>footer{text-align:center}
     iframe{width:100%;aspect-ratio:4/3;display:block;margin:1em auto;border:none}
     article img{display:block;margin:1em auto;max-width:90%}
+    article figure{margin:1em auto;width:fit-content;max-width:100%}
+    article .align-left{margin-left:0;margin-right:auto}
+    article .align-right{margin-left:auto;margin-right:0}
+    article .align-center{margin-left:auto;margin-right:auto}
+    article figure.align-left>img,article figure.align-right>img,article figure.align-center>img{margin:0}
+    article figure.align-left>figcaption{text-align:left}
+    article figure.align-right>figcaption{text-align:right}
+    article figure.align-center>figcaption{text-align:center}
+    article figure>figcaption{text-align:center}
     article>header h1{margin:0 0 .25em}
     article>header .post-meta{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:flex-end;gap:.5em}
     article>header .tags{display:flex;gap:.35em}
@@ -498,13 +507,19 @@
                             (organ/inline-text (:children link))
                             caption
                             "")
-                  extra (dissoc attrs :alt)
+                  align (some-> (:align attrs) str/trim str/lower-case)
+                  align-class (when (#{"left" "right" "center"} align) (str "align-" align))
+                  extra (dissoc attrs :alt :align)
+                  extra (if (and align-class (not caption))
+                          (update extra :class #(if (str/blank? %) align-class (str % " " align-class)))
+                          extra)
                   img   (str "<img src=\"" (escape-html url) "\" alt=\"" (escape-html alt) "\""
                              (when (str/blank? alt) " role=\"presentation\"")
                              (str/join (map (fn [[k v]] (str " " (name k) "=\"" (escape-html v) "\"")) extra))
                              ">")]
               (if caption
-                (str "<figure>" img "<figcaption>" (escape-html caption) "</figcaption></figure>")
+                (str "<figure" (when align-class (str " class=\"" align-class "\"")) ">"
+                     img "<figcaption>" (escape-html caption) "</figcaption></figure>")
                 img))
             (str "<p" (or (html-attrs node) "") ">" (render-inline c) "</p>")))
         ""))
