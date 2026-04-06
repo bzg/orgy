@@ -482,26 +482,30 @@
 (defn- render-node [node]
   (case (:type node)
     :paragraph
-    (let [c     (:content node)
-          attrs (get-in node [:affiliated :attr :html])]
+    (let [c       (:content node)
+          attrs   (get-in node [:affiliated :attr :html])
+          caption (get-in node [:affiliated :caption])]
       (if-let [text (organ/inline-text c)]
         (if (re-matches #"^\s*#\+\w+(?:\[\])?\s*:.*" text)
           "" ;; skip org keywords that organ didn't parse as metadata
-          ;; Single image link with ATTR_HTML: apply attrs to <img>
-          (if (and attrs
-                   (= 1 (count c))
+          ;; Standalone image link: render as <img> (wrapped in <figure> if captioned)
+          (if (and (= 1 (count c))
                    (= :link (:type (first c)))
                    (re-find image-ext-re (or (:target (first c)) (:url (first c)) "")))
             (let [link  (first c)
                   url   (resolve-file-url link)
                   alt   (or (:alt attrs)
                             (organ/inline-text (:children link))
+                            caption
                             "")
-                  extra (dissoc attrs :alt)]
-              (str "<img src=\"" (escape-html url) "\" alt=\"" (escape-html alt) "\""
-                   (when (str/blank? alt) " role=\"presentation\"")
-                   (str/join (map (fn [[k v]] (str " " (name k) "=\"" (escape-html v) "\"")) extra))
-                   ">"))
+                  extra (dissoc attrs :alt)
+                  img   (str "<img src=\"" (escape-html url) "\" alt=\"" (escape-html alt) "\""
+                             (when (str/blank? alt) " role=\"presentation\"")
+                             (str/join (map (fn [[k v]] (str " " (name k) "=\"" (escape-html v) "\"")) extra))
+                             ">")]
+              (if caption
+                (str "<figure>" img "<figcaption>" (escape-html caption) "</figcaption></figure>")
+                img))
             (str "<p" (or (html-attrs node) "") ">" (render-inline c) "</p>")))
         ""))
 
