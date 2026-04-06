@@ -372,7 +372,10 @@
           (if section
             (str lp "/" section "/" slug "/")
             (str lp "/" slug "/")))
-        (str/replace-first target #"^static/" "/")))
+        (let [expanded (str/replace-first target #"^~" (System/getProperty "user.home"))]
+          (if-let [m (re-find #"/static/(.+)$" expanded)]
+            (str "/" (second m))
+            (str/replace-first expanded #"^static/" "/")))))
     (:url node)))
 
 (def ^:private image-ext-re #"\.(?:png|jpg|jpeg|gif|svg|webp)$")
