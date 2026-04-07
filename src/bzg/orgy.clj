@@ -104,7 +104,6 @@
     article .align-left{margin-left:0;margin-right:auto}
     article .align-right{margin-left:auto;margin-right:0}
     article .align-center{margin-left:auto;margin-right:auto}
-    article figure.align-left>img,article figure.align-right>img,article figure.align-center>img{margin:0}
     article figure.align-left>figcaption{text-align:left}
     article figure.align-right>figcaption{text-align:right}
     article figure.align-center>figcaption{text-align:center}
