@@ -1,6 +1,13 @@
-{:deps {org.clojars.bzg/organ {:mvn/version "1.0.3"}}
+{:deps  {org.clojars.bzg/organ {:mvn/version "1.0.3"}}
  :paths ["src"]
  :tasks
  {orgy {:doc  "Run orgy (e.g. bb orgy -i myblog, bb orgy -i myblog serve)"
         :task (do (require 'bzg.orgy)
-                  (apply (resolve 'bzg.orgy/-main) *command-line-args*))}}}
+                  (apply (resolve 'bzg.orgy/-main) *command-line-args*))}
+  test {:doc        "Run the test suite"
+        :extra-paths ["test"]
+        :task       (do (require 'clojure.test
+                                 'bzg.orgy-test)
+                        (let [{:keys [fail error]}
+                              (clojure.test/run-tests 'bzg.orgy-test)]
+                          (System/exit (if (zero? (+ fail error)) 0 1))))}}}

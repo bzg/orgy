@@ -36,10 +36,10 @@ orgy
 # Build myblog as a website in ./public
 orgy -i myblog
 
-# Initialize config and templates (optional)
+# Bootstrap a site: writes myblog/config.edn and myblog/templates/
 orgy -i myblog init
 
-# Build and serve locally
+# Build and serve locally, watching for changes
 orgy -i myblog serve
 
 # Show all options
@@ -71,8 +71,9 @@ myblog/
   paths.
 - *Language detection*: from filename suffix (=post.fr.org= → French) or
   =#+language:= header. No suffix and no header defaults to ="en"=.
-- *Index pages*: =index.{lang}.org= or =_index.{lang}.org= at the root
-  renders as the homepage for that language.
+- *Index pages*: =index.{lang}.org= (or =index.org=) at the root
+  renders as the homepage for that language. When absent, orgy
+  generates a listing of the 10 most recent posts instead.
 
 * Org file headers
 
@@ -100,13 +101,15 @@ Options:
   -i, --input-dir DIR   Input directory containing org files (default: .)
   -o, --output-dir DIR  Output directory (default: ./public)
   -c, --config FILE     Path to config.edn (default: input-dir or working dir)
+  -C, --config-write    Write a default config.edn in the input directory
   -s, --skip-dirs DIRS  Comma-separated directories to skip (e.g. drafts,old)
   -t, --theme VALUE     CSS theme (see examples below)
+  -h, --help            Show this help
 
 Commands:
   (none)           Build the static site
   serve [port]     Build and serve locally (default port: 1888)
-  init             Export templates and config for customization
+  init             Export config.edn and templates for customization
   clean            Remove the output directory
   help             Show this help
 #+end_example
@@ -131,16 +134,21 @@ orgy -i myblog -t ./themes/custom.css
 
 All keys in =config.edn= are optional:
 
-| Key           | Default        | Description                                      |
-|---------------+----------------+--------------------------------------------------|
-| =:title=        | directory name | Site title                                       |
-| =:base-url=     | =""=             | Base URL for absolute links (RSS, sitemap, etc.) |
-| =:copyright=    | =""=             | Footer copyright notice                          |
-| =:languages=    | =["en"]=         | Languages to generate indexes and feeds for      |
-| =:menu=         | /all/            | Ordered list of nav entries (see below)          |
-| =:theme=        | /none/           | CSS theme (name, URL, or path — see CLI section) |
-| =:quick-search= | =false=          | Enable client-side quick search                  |
-| =:theme-toggle= | =false=          | Show a light/dark theme toggle in the nav bar    |
+| Key           | Default        | Description                                           |
+|---------------+----------------+-------------------------------------------------------|
+| =:title=        | directory name | Site title                                            |
+| =:base-url=     | =""=             | Base URL for absolute links (RSS, sitemap, etc.)      |
+| =:copyright=    | =""=             | Footer copyright notice                               |
+| =:languages=    | /inferred/       | Languages to render; inferred from posts when omitted |
+| =:menu=         | /all/            | Ordered list of nav entries (see below)               |
+| =:theme=        | /none/           | CSS theme (name, URL, or path — see CLI section)      |
+| =:quick-search= | =false=          | Enable client-side quick search                       |
+| =:theme-toggle= | =false=          | Show a light/dark theme toggle in the nav bar         |
+
+When =:languages= is omitted, orgy infers the language set from post
+filenames (=post.fr.org= → =fr=) and =#+language:= headers, falling
+back to =["en"]= only when nothing is detected — so an all-French
+blog never gets a phantom English subtree.
 
 ** Menu configuration
 
@@ -158,8 +166,12 @@ multilingual mode, language switcher links are also appended.
 
 * Templates
 
-Run =orgy -i DIR init= to export all default templates into
-=DIR/templates/=. You can then edit them freely.  Available templates:
+Run =orgy -i DIR init= to export a default =config.edn= and the full
+set of Selmer templates into =DIR/templates/=. You can then edit them
+freely. To only write the config without the templates, use =orgy -i DIR
+--config-write=.
+
+Available templates:
 
 - =base.html= -- page layout (head, nav, footer, search, highlight.js)
 - =post.html= -- single post / page
@@ -167,6 +179,8 @@ Run =orgy -i DIR init= to export all default templates into
 - =tag.html= -- posts for a given tag
 - =tags-index.html= -- all tags
 - =feed.xml= -- RSS feed
+- =sitemap.xml= -- XML sitemap
+- =redirect.html= -- root-to-language redirect used in multilingual mode
 
 Templates use [[https://github.com/yogthos/Selmer][Selmer]] syntax. Template variables include =title=,
 =date=, =tags=, =content=, =lang=, =menu=, =site.title=, =site.copyright=,
