@@ -29,9 +29,8 @@ Assuming [[https://github.com/babashka/bbin][bbin]] is installed:
 - Customisable CSS theme (pico-themes name, URL, or local file)
 - Syntax highlighting via [[https://highlightjs.org][highlight.js]] (loaded only on pages with code)
 
-* Requirements
+* Tutorial
 
-- [[https://babashka.org][Babashka]]
 
 * Quick start
 
@@ -51,6 +50,13 @@ orgy -i myblog serve
 # Show all options
 orgy help
 #+end_src
+
+You can also check this tutorial: [[https://bzg.fr/en/notes/orgy-tutorial/][Get ready for Orgy in 15 minutes]]
+
+Once =orgy serve= launches the server, open [[http://localhost:1888]] in to
+preview the site. The server rebuilds automatically when you edit your
+org files — just refresh the page to see the changes. Use =serve PORT=
+to pick a different port (e.g. =orgy -i myblog serve 3000=).
 
 * Example directory layout
 
