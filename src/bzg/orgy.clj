@@ -283,6 +283,10 @@ article h5,article h6{font-size:1rem}
   {% endfor %}
   <script>" mpl-license " hljs.highlightAll(); // @license-end</script>
   {% endif %}
+  {% if has-math %}
+  <script>window.MathJax={tex:{inlineMath:[['\\\\(','\\\\)']],displayMath:[['\\\\[','\\\\]']]}};</script>
+  <script src=\"https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js\" async></script>
+  {% endif %}
 </body>
 </html>")
 
@@ -428,20 +432,29 @@ article h5,article h6{font-size:1rem}
    "sh" "bash" "zsh" "bash"
    "js" "javascript" "ts" "typescript"})
 
-(defn- collect-code-langs
-  "Collect highlight.js language names from src-blocks in the AST.
-   Returns {:has-code bool :hl-langs [extra langs to load]}."
+(defn- collect-page-features
+  "Walk the AST once to collect per-page render flags:
+   - :has-code / :hl-langs  — src-block languages for highlight.js
+   - :has-math              — any LaTeX fragment or environment (triggers MathJax)"
   [ast]
-  (letfn [(walk [acc node]
-            (let [acc (if (= :src-block (:type node))
-                        (if-let [l (some-> (:language node) str/lower-case)]
-                          (conj acc (get hljs-lang-map l l))
-                          acc)
-                        acc)]
-              (reduce walk (reduce walk acc (:children node)) (:items node))))]
-    (let [all (reduce walk #{} (:children ast))]
-      {:has-code (boolean (seq all))
-       :hl-langs (vec (remove hljs-builtin all))})))
+  (let [langs (volatile! #{})
+        math? (volatile! false)]
+    (letfn [(walk [node]
+              (when (map? node)
+                (case (:type node)
+                  :src-block         (when-let [l (some-> (:language node) str/lower-case)]
+                                       (vswap! langs conj (get hljs-lang-map l l)))
+                  :latex-fragment    (vreset! math? true)
+                  :latex-environment (vreset! math? true)
+                  nil)
+                (when (coll? (:content node))  (run! walk (:content node)))
+                (when (coll? (:title node))    (run! walk (:title node)))
+                (when (coll? (:children node)) (run! walk (:children node)))
+                (when (coll? (:items node))    (run! walk (:items node)))))]
+      (run! walk (:children ast))
+      {:has-code (boolean (seq @langs))
+       :hl-langs (vec (remove hljs-builtin @langs))
+       :has-math @math?})))
 
 (defn- truncate [s n]
   (if (> (count s) n)
@@ -571,6 +584,11 @@ article h5,article h6{font-size:1rem}
                 (= t :footnote-ref)    (let [l (escape-html (:label node))]
                                          (str "<sup><a href=\"#fn-" l "\" id=\"fnref-" l "\">" l "</a></sup>"))
                 (= t :timestamp)       (:raw node)
+                (= t :latex-fragment)  (let [v (escape-html (:value node))]
+                                         (case (:kind node)
+                                           (:paren :dollar)    (str "\\(" v "\\)")
+                                           (:bracket :dollars) (str "\\[" v "\\]")
+                                           v))
                 :else                  "")))
           nodes))))
 
@@ -676,6 +694,9 @@ article h5,article h6{font-size:1rem}
                     (render-list-items (:items node) (:ordered node)))
     :table        (render-table node)
     :fixed-width  (str "<pre>" (escape-html (:content node)) "</pre>")
+    :latex-environment (str "<div class=\"math-display\">"
+                            (escape-html (:content node))
+                            "</div>")
     :footnote-def (let [lbl (escape-html (:label node))]
                     (str "<div class=\"footnote\" id=\"fn-" lbl "\"><sup>" lbl "</sup> "
                          (render-inline (:content node))
@@ -708,7 +729,7 @@ article h5,article h6{font-size:1rem}
     :block        (if (= :export (:block-type node)) "" (:content node))
     :table        (str/join " " (mapcat (fn [row] (map organ/inline-text row)) (:rows node)))
     :footnote-def (organ/inline-text (:content node))
-    (:comment :drawer :html-line) ""
+    (:comment :drawer :html-line :latex-line :latex-environment) ""
     (if (:children node) (children-text (:children node)) "")))
 
 (defn- ast->text
@@ -891,7 +912,7 @@ article h5,article h6{font-size:1rem}
   (binding [*current-source-file* (:path post)]
     (let [lang (:lang post)
           ctx  (merge (site-context config lang)
-                      (collect-code-langs (:ast post))
+                      (collect-page-features (:ast post))
                       {:menu        menu
                        :title       (page-title post)
                        :date        (:date post)
@@ -931,7 +952,7 @@ article h5,article h6{font-size:1rem}
       (binding [*current-source-file* index-file]
         (let [ast (organ/parse-org (slurp index-file))]
           (write-file! out (render-page "post.html"
-                                        (merge ctx (collect-code-langs ast)
+                                        (merge ctx (collect-page-features ast)
                                                {:title       (:title (:meta ast))
                                                 :description (truncate (ast->text ast) description-max-chars)
                                                 :content     (ast->html ast)})))))
