@@ -27,7 +27,12 @@ Assuming [[https://github.com/babashka/bbin][bbin]] is installed:
 - Draft support (=#+draft: true= excludes a file from export)
 - SEO: meta description, Open Graph tags, canonical URLs, =sitemap.xml=
 - Customisable CSS theme (pico-themes name, URL, or local file)
-- Syntax highlighting via [[https://highlightjs.org][highlight.js]] (loaded only on pages with code)
+- Syntax highlighting enabled by default via [[https://highlightjs.org][highlight.js]] (script
+  loaded only on pages that actually contain source blocks)
+- LaTeX math supported natively: inline (=$x^2$=, =\(...\)=), display
+  (=$$...$$=, =\[...\]=) and environments (=\begin{equation}...\end{equation}=,
+  =align=, etc.) are rendered via [[https://www.mathjax.org][MathJax]], loaded only on pages that
+  contain maths
 
 * Tutorial
 

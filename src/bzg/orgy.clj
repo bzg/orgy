@@ -96,7 +96,8 @@
             :languages      (:languages cfg)
             :quick-search   (:quick-search cfg)
             :theme-toggle   (:theme-toggle cfg)
-            :menu           (:menu cfg)}
+            :menu           (:menu cfg)
+            :exclude-tags   (:exclude-tags cfg)}
            (dissoc overrides :config-path :theme))))
 
 ;; ---------------------------------------------------------------------------
@@ -533,6 +534,24 @@ article h5,article h6{font-size:1rem}
   "Directories to skip when scanning for content."
   #{"static" "public" "templates" ".git"})
 
+(def ^:dynamic ^:private *excluded-tags*
+  "Headline tags whose subtree is dropped before rendering. Mirrors
+   Emacs' `org-export-exclude-tags`. Overridable via config.edn's
+   :exclude-tags key."
+  #{"noexport"})
+
+(defn- excluded-section? [node]
+  (and (= :section (:type node))
+       (some *excluded-tags* (:tags node))))
+
+(defn- prune-excluded-sections
+  "Recursively drop :section children whose :tags intersect *excluded-tags*."
+  [node]
+  (if-let [children (:children node)]
+    (assoc node :children
+           (mapv prune-excluded-sections (remove excluded-section? children)))
+    node))
+
 (def ^:private ignored-root-files
   "Files orgy owns that must never leak into the output. Users keep
    unrelated tooling out via directory layout or --skip-dirs."
@@ -797,7 +816,7 @@ article h5,article h6{font-size:1rem}
   [scanned]
   (let [{:keys [path lang tags]} scanned
         org-text (slurp path)
-        ast      (organ/parse-org org-text)
+        ast      (prune-excluded-sections (organ/parse-org org-text))
         meta     (:meta ast)
         slug     (file-slug path)
         section  (file-section path)
@@ -950,7 +969,7 @@ article h5,article h6{font-size:1rem}
                    {:menu menu :canonical (canonical-url config (str lp "/"))})]
     (if index-file
       (binding [*current-source-file* index-file]
-        (let [ast (organ/parse-org (slurp index-file))]
+        (let [ast (prune-excluded-sections (organ/parse-org (slurp index-file)))]
           (write-file! out (render-page "post.html"
                                         (merge ctx (collect-page-features ast)
                                                {:title       (:title (:meta ast))
@@ -1161,8 +1180,10 @@ article h5,article h6{font-size:1rem}
   (binding [*input-dir*  (str (fs/canonicalize (or input-dir ".")))
             *output-dir* (str (fs/canonicalize (or output-dir "public")))]
     (let [config (load-config (dissoc overrides :input-dir :output-dir :skip-dirs))
-          extra  (into (set skip-dirs) (:skip-dirs config))]
-      (binding [*ignored-dirs* (into *ignored-dirs* extra)]
+          extra  (into (set skip-dirs) (:skip-dirs config))
+          tags   (:exclude-tags config)]
+      (binding [*ignored-dirs*  (into *ignored-dirs* extra)
+                *excluded-tags* (if tags (set (map name tags)) *excluded-tags*)]
         (let [scanned (map prescan-org-file (list-org-files))
               mono?   (detect-monolingual? config scanned)]
           (binding [*monolingual* mono?]
@@ -1287,6 +1308,10 @@ article h5,article h6{font-size:1rem}
  ;; Can be: a pico-themes name (e.g. \"teletype\"), an https:// URL,
  ;; a file:/// URL, or a path to a local .css file.
  ;; :theme \"teletype\"
+
+ ;; Headline tags whose subtree is dropped from the export.
+ ;; Mirrors Emacs' org-export-exclude-tags. Default: [\"noexport\"].
+ ;; :exclude-tags [\"noexport\" \"draft\"]
  }")
 
 (defn- write-if-absent! [path content label]
