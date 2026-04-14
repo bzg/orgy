@@ -286,7 +286,7 @@ article h5,article h6{font-size:1rem}
   {% endif %}
   {% if has-math %}
   <script>window.MathJax={tex:{inlineMath:[['\\\\(','\\\\)']],displayMath:[['\\\\[','\\\\]']]}};</script>
-  <script src=\"https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js\" async></script>
+  <script src=\"https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js\" async></script>
   {% endif %}
 </body>
 </html>")
