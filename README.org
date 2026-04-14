@@ -5,6 +5,12 @@
 A static blog generator that turns [[https://orgmode.org][Org mode]] files into a website.
 Powered by [[https://github.com/bzg/organ][organ]] and [[https://github.com/yogthos/Selmer][Selmer]], runs on [[https://babashka.org][Babashka]].
 
+* Install
+
+Assuming [[https://github.com/babashka/bbin][bbin]] is installed:
+
+: bbin install io.github.bzg/orgy
+
 * Features
 
 - Org files parsed to HTML via organ (inline markup, code blocks,
