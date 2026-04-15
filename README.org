@@ -13,29 +13,25 @@ Assuming [[https://github.com/babashka/bbin][bbin]] is installed:
 
 * Features
 
-- Org files parsed to HTML via organ (inline markup, code blocks,
-  tables, lists, ...)
-- Content sections: subdirectories become categories with their own index
-- Automatic monolingual/multilingual detection: files go to
-  =public/slug/= by default, or =public/en/slug/= when multiple languages
-  are detected. =post.fr.org= and =post.en.org= produce separate indexes
-  and RSS feeds
+- Org files parsed to AST and exported to HTML (via [[https://codeberg.org/bzg/organ][organ]])
+- Content sections: subdirectories become categories
+- Monolingual/multilingual detection: files go to =public/slug/= by
+  default, or =public/en/slug/= when multiple languages are detected
+  =post.fr.org= and =post.en.org= produce separate indexes and RSS feeds
 - Tag pages and tag index
 - Client-side quick search (opt-in via =:quick-search true=)
 - Light/dark theme toggle (opt-in via =:theme-toggle true=)
-- Configurable navigation menu with support for direct links
+- Navigation menu with support for direct links
 - Draft support (=#+draft: true= excludes a file from export)
-- SEO: meta description, Open Graph tags, canonical URLs, =sitemap.xml=
-- Customisable CSS theme (pico-themes name, URL, or local file)
-- Syntax highlighting enabled by default via [[https://highlightjs.org][highlight.js]] (script
-  loaded only on pages that actually contain source blocks)
-- LaTeX math supported natively: inline (=$x^2$=, =\(...\)=), display
-  (=$$...$$=, =\[...\]=) and environments (=\begin{equation}...\end{equation}=,
-  =align=, etc.) are rendered via [[https://www.mathjax.org][MathJax]], loaded only on pages that
-  contain maths
+- SEO: meta description, Open Graph tags, =sitemap.xml=
+- CSS theme (pico-themes name, URL or local file)
+- Syntax highlighting enabled via [[https://highlightjs.org][highlight.js]]
+- LaTeX math supported natively.
 
-* Tutorial
+=Orgy= will *not* support: 
 
+- Markdown
+- Org babel execution
 
 * Quick start
 
