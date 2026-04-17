@@ -207,6 +207,41 @@
 ;; resolve-languages
 ;; ---------------------------------------------------------------------------
 
+;; ---------------------------------------------------------------------------
+;; CUSTOM_ID / ID on section headers
+;; ---------------------------------------------------------------------------
+
+(def render-node @#'orgy/render-node)
+
+(deftest section-custom-id-test
+  (testing "CUSTOM_ID becomes id attribute"
+    (is (str/includes?
+         (render-node {:type :section :level 1
+                       :title [{:type :text :value "Hello"}]
+                       :properties {:custom_id "my-id"}
+                       :children []})
+         "<h2 id=\"my-id\">Hello</h2>")))
+  (testing "ID is used when CUSTOM_ID is absent"
+    (is (str/includes?
+         (render-node {:type :section :level 1
+                       :title [{:type :text :value "Hi"}]
+                       :properties {:id "fallback"}
+                       :children []})
+         "<h2 id=\"fallback\">Hi</h2>")))
+  (testing "CUSTOM_ID wins over ID"
+    (is (str/includes?
+         (render-node {:type :section :level 1
+                       :title [{:type :text :value "T"}]
+                       :properties {:id "a" :custom_id "b"}
+                       :children []})
+         "id=\"b\"")))
+  (testing "no id when neither property is set"
+    (is (str/includes?
+         (render-node {:type :section :level 1
+                       :title [{:type :text :value "T"}]
+                       :children []})
+         "<h2>T</h2>"))))
+
 (deftest resolve-languages-test
   (testing "explicit config wins and is unioned with posts"
     (is (= ["en" "fr"]

@@ -690,10 +690,13 @@ article h5,article h6{font-size:1rem}
     :paragraph    (render-paragraph node)
     :html-line    (:content node)
     :section      (let [level (inc (:level node))
-                        body  (render-children (:children node))]
+                        body  (render-children (:children node))
+                        props (:properties node)
+                        id    (or (:custom_id props) (:id props))
+                        attr  (when id (str " id=\"" (escape-html id) "\""))]
                     (if (<= level 6)
-                      (str "<h" level ">" (render-inline (:title node)) "</h" level ">\n" body)
-                      (str "<p><strong>" (render-inline (:title node)) "</strong></p>\n" body)))
+                      (str "<h" level attr ">" (render-inline (:title node)) "</h" level ">\n" body)
+                      (str "<p" attr "><strong>" (render-inline (:title node)) "</strong></p>\n" body)))
     :src-block    (let [lang (some-> (:language node) str/lower-case (as-> l (get hljs-lang-map l l)))]
                     (str "<pre><code"
                          (when lang (str " class=\"language-" lang "\""))
