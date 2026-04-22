@@ -393,7 +393,22 @@ article h5,article h6{font-size:1rem}
    "redirect.html"
    "<!DOCTYPE html>
 <html>
-  <head><meta http-equiv=\"refresh\" content=\"0;url={{target}}\"></head>
+  <head>
+    <meta http-equiv=\"refresh\" content=\"0;url={{target}}\">{% if langs %}
+    <script>
+      (function () {
+        var langs = {{langs|safe}};
+        var nav = navigator.languages || [navigator.language || \"\"];
+        for (var i = 0; i < nav.length; i++) {
+          var code = (nav[i] || \"\").toLowerCase().split(\"-\")[0];
+          if (langs.indexOf(code) !== -1) {
+            location.replace(\"/\" + code + \"/\");
+            return;
+          }
+        }
+      })();
+    </script>{% endif %}
+  </head>
   <body></body>
 </html>"})
 
@@ -1161,11 +1176,13 @@ article h5,article h6{font-size:1rem}
 
 (defn- render-root-redirect!
   "In multilingual mode, write a minimal /index.html that redirects
-   to the first language. No-op in monolingual mode."
+   to the first matching navigator language, falling back to the first
+   configured language via <meta refresh>. No-op in monolingual mode."
   [langs]
   (when-not *monolingual*
     (let [html (render-template "redirect.html"
-                                {:target (str "/" (first langs) "/")})]
+                                {:target (str "/" (first langs) "/")
+                                 :langs  (json/generate-string (vec langs))})]
       (write-file! (str *output-dir* "/index.html") html))))
 
 (defn- copy-all-assets!
