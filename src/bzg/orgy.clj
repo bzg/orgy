@@ -6,6 +6,7 @@
 (ns bzg.orgy
   "Static blog engine: org files → HTML via organ + selmer."
   (:require [babashka.fs :as fs]
+            [babashka.process :as process]
             [cheshire.core :as json]
             [clojure.edn :as edn]
             [clojure.string :as str]
@@ -1363,6 +1364,7 @@ article h5,article h6{font-size:1rem}
    ["-s" "--skip-dirs DIRS"  "Comma-separated directories to skip (e.g. drafts,old)"
     :parse-fn #(str/split % #",")]
    ["-t" "--theme VALUE"     "CSS theme: name (pico-themes), https:// URL, file:/// URL, or path to a .css file"]
+   ["-v" "--version"         "Show the orgy version"]
    ["-h" "--help"]])
 
 (def ^:private usage-text
@@ -1384,13 +1386,27 @@ Options:")
       (select-keys [:input-dir :output-dir :config-path :theme :skip-dirs])
       (as-> m (into {} (remove #(nil? (val %)) m)))))
 
+(defn- bbin-version
+  "Version string read from bbin's install metadata (`bbin ls --edn`), or nil
+  when bbin is absent or orgy was not installed through it."
+  []
+  (try
+    (let [{:keys [out exit]} (process/shell {:out :string :err :string :continue true}
+                                            "bbin" "ls" "--edn")]
+      (when (zero? exit)
+        (some (fn [e] (when (= 'io.github.bzg/orgy (:lib e))
+                        (get-in e [:coords :git/tag])))
+              (vals (edn/read-string out)))))
+    (catch Exception _ nil)))
+
 (defn -main [& args]
   (let [{:keys [options arguments errors summary]} (cli/parse-opts args cli-options)
-        {:keys [help config-write input-dir output-dir]} options
+        {:keys [help version config-write input-dir output-dir]} options
         overrides (->overrides options)
         cmd       (first arguments)]
     (cond
       (seq errors)             (do (doseq [e errors] (println e)) (System/exit 1))
+      version                  (println (str "orgy " (or (bbin-version) "(version unknown)")))
       (or help (= cmd "help")) (println (str usage-text "\n" summary))
       config-write             (write-if-absent! (str input-dir "/config.edn") default-config "config.edn")
       (= cmd "serve")          (serve! {:port (or (some-> (second arguments) parse-long) default-serve-port)
