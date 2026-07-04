@@ -410,7 +410,9 @@ article h5,article h6{font-size:1rem}
       })();
     </script>{% endif %}
   </head>
-  <body></body>
+  <body>
+    <p><a href=\"{{target}}\">{{target}}</a></p>
+  </body>
 </html>"})
 
 (defn- resolve-template
