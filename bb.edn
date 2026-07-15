@@ -1,4 +1,4 @@
-{:deps  {org.clojars.bzg/organ {:mvn/version "3.0.0"}}
+{:deps  {org.clojars.bzg/organ {:mvn/version "3.1.0"}}
  :paths ["src"]
  :tasks
  {orgy {:doc  "Run orgy (e.g. bb orgy -i myblog, bb orgy -i myblog serve)"
