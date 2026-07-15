@@ -423,10 +423,28 @@ article h5,article h6{font-size:1rem}
       (slurp file-path)
       (get default-templates template-name))))
 
+(defn- compile-template
+  "Parse a selmer template string into a compiled template."
+  [s]
+  (selmer/parse selmer/parse-input (java.io.StringReader. s)))
+
+(def ^:dynamic ^:private *templates*
+  "Map of template name → compiled selmer template. Bound once per
+   build: selmer/render re-parses its string argument on every call,
+   which dominated build time before templates were compiled upfront."
+  nil)
+
+(defn- compile-templates []
+  (into {} (map (fn [n] [n (compile-template (resolve-template n))]))
+        (keys default-templates)))
+
 (defn- render-template
   "Render a template by name."
   [template-name ctx]
-  (-> template-name resolve-template (selmer/render ctx)))
+  (selmer/render-template
+   (or (get *templates* template-name)
+       (compile-template (resolve-template template-name)))
+   ctx))
 
 (defn- render-page
   "Render a page template wrapped in the base layout."
@@ -537,8 +555,13 @@ article h5,article h6{font-size:1rem}
   (if (not= :file (:link-type node))
     (:url node)
     (let [target (:target node)]
-      (if (str/ends-with? target ".org")
+      (cond
+        ;; file:https://… — the target is really a URL; pass it through
+        (re-find #"^[a-z][a-z0-9+.-]*://" target)
+        target
+        (str/ends-with? target ".org")
         (org-target->url target)
+        :else
         (let [expanded (str/replace-first target #"^~" (System/getProperty "user.home"))]
           (cond
             (re-find #"/static/" expanded)        (str "/" (second (re-find #"/static/(.+)$" expanded)))
@@ -818,7 +841,7 @@ article h5,article h6{font-size:1rem}
 
 (defn- prescan-org-file
   "Read an org file and extract lightweight metadata via regex.
-   The file text is not retained — only :path, :lang, :tags, :draft?."
+   The file text is kept under :text so load-post needn't re-read it."
   [path]
   (let [org-text (slurp (str path))
         lang    (or (file-lang path)
@@ -829,15 +852,16 @@ article h5,article h6{font-size:1rem}
     {:path   (str path)
      :lang   lang
      :tags   tags
-     :draft? draft?}))
+     :draft? draft?
+     :text   org-text}))
 
 (defn- load-post
-  "Parse a pre-scanned org file into a full post map.
-   Re-reads the file for organ parsing; prescan metadata avoids redundant extraction."
+  "Parse a pre-scanned org file into a full post map. :html and
+   :plain-text are rendered here, once, so feeds, descriptions and
+   the search index don't re-render the AST."
   [scanned]
-  (let [{:keys [path lang tags]} scanned
-        org-text (slurp path)
-        ast      (prune-excluded-sections (organ/parse-org org-text))
+  (let [{:keys [path lang tags text]} scanned
+        ast      (prune-excluded-sections (organ/parse-org text))
         meta     (:meta ast)
         slug     (file-slug path)
         section  (file-section path)
@@ -855,6 +879,8 @@ article h5,article h6{font-size:1rem}
      :section section
      :url     url
      :ast     ast
+     :html    (binding [*current-source-file* path] (ast->html ast))
+     :plain-text (ast->text ast)
      :path    path}))
 
 (defn- in-ignored-dir? [root path]
@@ -878,7 +904,7 @@ article h5,article h6{font-size:1rem}
   (->> scanned-files
        (remove #(index-file? (:path %)))
        (remove :draft?)
-       (map load-post)
+       (pmap load-post)
        (sort-by :date date-desc)))
 
 ;; ---------------------------------------------------------------------------
@@ -930,7 +956,7 @@ article h5,article h6{font-size:1rem}
   (spit (str path) content))
 
 (defn- post-description [post]
-  (truncate (ast->text (:ast post)) description-max-chars))
+  (truncate (:plain-text post) description-max-chars))
 
 (defn- canonical-url [config url]
   (when-let [base (not-empty (:base-url config))] (str base url)))
@@ -949,23 +975,22 @@ article h5,article h6{font-size:1rem}
   (select-keys post [:title :date :url]))
 
 (defn- render-post! [config post menu prev-post next-post]
-  (binding [*current-source-file* (:path post)]
-    (let [lang (:lang post)
-          ctx  (merge (site-context config lang)
-                      (collect-page-features (:ast post))
-                      {:menu        menu
-                       :title       (page-title post)
-                       :date        (:date post)
-                       :author      (:author post)
-                       :tags        (:tags post)
-                       :description (post-description post)
-                       :canonical   (canonical-url config (:url post))
-                       :has-nav     (boolean (or prev-post next-post))
-                       :prev        (when prev-post (select-keys prev-post [:title :url]))
-                       :next        (when next-post (select-keys next-post [:title :url]))
-                       :content     (ast->html (:ast post))})]
-      (write-file! (str *output-dir* (:url post) "index.html")
-                   (render-page "post.html" ctx)))))
+  (let [lang (:lang post)
+        ctx  (merge (site-context config lang)
+                    (collect-page-features (:ast post))
+                    {:menu        menu
+                     :title       (page-title post)
+                     :date        (:date post)
+                     :author      (:author post)
+                     :tags        (:tags post)
+                     :description (post-description post)
+                     :canonical   (canonical-url config (:url post))
+                     :has-nav     (boolean (or prev-post next-post))
+                     :prev        (when prev-post (select-keys prev-post [:title :url]))
+                     :next        (when next-post (select-keys next-post [:title :url]))
+                     :content     (:html post)})]
+    (write-file! (str *output-dir* (:url post) "index.html")
+                 (render-page "post.html" ctx))))
 
 (defn- render-list!
   "Render the index page for a (non-nil) section. The root index
@@ -1044,7 +1069,7 @@ article h5,article h6{font-size:1rem}
                                        :url        (:url p)
                                        :date       (:date p)
                                        :rfc822-date (iso->rfc822 (:date p))
-                                       :content    (str/replace (absolutize-urls (ast->html (:ast p)) base)
+                                       :content    (str/replace (absolutize-urls (:html p) base)
                                                                 "]]>" "]]&gt;")})))}
            xml (render-template "feed.xml" ctx)]
        (write-file! out-path xml)))))
@@ -1054,7 +1079,7 @@ article h5,article h6{font-size:1rem}
   ;; :d date, :b body.
   (let [entries (map (fn [p]
                        {:t (:title p) :u (:url p) :d (:date p)
-                        :b (truncate (ast->text (:ast p)) search-body-max-chars)})
+                        :b (truncate (:plain-text p) search-body-max-chars)})
                      posts)
         out     (str *output-dir* (lang-prefix lang) "/search.json")]
     (write-file! out (json/generate-string entries))))
@@ -1082,16 +1107,33 @@ article h5,article h6{font-size:1rem}
           xml      (render-template "sitemap.xml" {:entries entries})]
       (write-file! (str *output-dir* "/sitemap.xml") xml))))
 
+(defn- copy-file-if-changed!
+  "Copy src to dest unless dest already exists with the same size and
+   an mtime at least as recent as src — keeps rebuild I/O proportional
+   to what actually changed."
+  [src dest]
+  (when (or (not (fs/exists? dest))
+            (not= (fs/size src) (fs/size dest))
+            (pos? (compare (fs/last-modified-time src) (fs/last-modified-time dest))))
+    (when-let [p (fs/parent dest)] (fs/create-dirs p))
+    (fs/copy src dest {:replace-existing true})))
+
 (defn- copy-static! []
   (let [static-dir (str *input-dir* "/static")]
     (when (fs/exists? static-dir)
-      (fs/copy-tree static-dir *output-dir* {:replace-existing true}))))
+      (doseq [file (->> (fs/glob static-dir "**" {:hidden true})
+                        (filter fs/regular-file?))]
+        (copy-file-if-changed! file (fs/path *output-dir*
+                                             (str (fs/relativize static-dir file))))))))
 
 (defn- copy-assets!
   "Copy non-org files from content root to output, preserving paths.
-   Skips static/, public/, templates/, .git/, config files, and hidden files."
+   Skips static/, public/, templates/, .git/, config files, hidden
+   files, and files shadowed by static/ (static/ is authoritative
+   for a given output path)."
   []
-  (let [root *input-dir*]
+  (let [root       *input-dir*
+        static-dir (str root "/static")]
     (doseq [file (->> (distinct (concat (fs/glob root "*") (fs/glob root "**/*")))
                       (filter fs/regular-file?)
                       (remove #(str/ends-with? (str %) ".org"))
@@ -1099,9 +1141,9 @@ article h5,article h6{font-size:1rem}
                       (remove #(in-ignored-dir? root %)))]
       (let [rel  (str (fs/relativize root file))
             dest (str *output-dir* "/" rel)]
-        (when-not (contains? ignored-root-files rel)
-          (fs/create-dirs (fs/parent dest))
-          (fs/copy file dest {:replace-existing true}))))))
+        (when-not (or (contains? ignored-root-files rel)
+                      (fs/exists? (fs/path static-dir rel)))
+          (copy-file-if-changed! file dest))))))
 
 (defn- detect-monolingual?
   "Return true when there is no indication of multiple languages.
@@ -1206,7 +1248,8 @@ article h5,article h6{font-size:1rem}
           extra  (into (set skip-dirs) (:skip-dirs config))
           tags   (:exclude-tags config)]
       (binding [*ignored-dirs*  (into *ignored-dirs* extra)
-                *excluded-tags* (if tags (set (map name tags)) *excluded-tags*)]
+                *excluded-tags* (if tags (set (map name tags)) *excluded-tags*)
+                *templates*     (compile-templates)]
         (let [scanned (map prescan-org-file (list-org-files))
               mono?   (detect-monolingual? config scanned)]
           (binding [*monolingual* mono?]
