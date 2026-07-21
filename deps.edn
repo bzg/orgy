@@ -1,1 +1,1 @@
-{:deps {org.clojars.bzg/organ {:mvn/version "3.2.0"}}}
+{:deps {org.clojars.bzg/organ {:mvn/version "3.2.1"}}}
