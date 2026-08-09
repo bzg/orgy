@@ -1,2 +1,3 @@
 content/*
 config.edn
+.cpcache/*
