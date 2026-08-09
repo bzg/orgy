@@ -23,8 +23,8 @@
 (def ^:dynamic *monolingual* false)
 (def ^:dynamic ^:private *current-source-file*
   "Absolute path of the org file currently being rendered. Used by
-   resolve-file-url to rewrite relative asset references to
-   site-absolute URLs that survive the slug-subdirectory wrap."
+  resolve-file-url to rewrite relative asset references to
+  site-absolute URLs that survive the slug-subdirectory wrap."
   nil)
 
 ;; ---------------------------------------------------------------------------
@@ -63,8 +63,8 @@
 ;; ---------------------------------------------------------------------------
 
 (defn- resolve-css-theme
-  "Resolve a --theme value to {:link url} or {:inline css}.
-   Priority: https URL → file:/// URL → .css file path → pico-themes name."
+  "Resolve a --theme value to {:link url} or {:inline css}. Priority:
+  https URL → file:/// URL → .css file path → pico-themes name."
   [value]
   (when value
     (cond
@@ -230,7 +230,7 @@ article h5,article h6{font-size:1rem}
 <head>
   <meta charset=\"utf-8\">
   <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
-  <title>{% if title %}{{title}} — {% endif %}{{site.title}}</title>
+  <title>{% if title %}{{title}} - {% endif %}{{site.title}}</title>
   {% if description %}<meta name=\"description\" content=\"{{description}}\">{% endif %}
   <meta property=\"og:title\" content=\"{% if title %}{{title}}{% else %}{{site.title}}{% endif %}\">
   {% if description %}<meta property=\"og:description\" content=\"{{description}}\">{% endif %}
@@ -275,7 +275,7 @@ article h5,article h6{font-size:1rem}
   </main>
   {% if site.copyright|not-empty %}
   <footer class=\"container\">
-    <p>{{site.copyright}} — Made with <a href=\"https://codeberg.org/bzg/orgy\">Orgy</a>{% if site.base-url|not-empty %} — <a href=\"{{lang-prefix}}/feed.xml\">RSS</a>{% endif %}</p>
+    <p>{{site.copyright}} - Made with <a href=\"https://codeberg.org/bzg/orgy\">Orgy</a>{% if site.base-url|not-empty %} - <a href=\"{{lang-prefix}}/feed.xml\">RSS</a>{% endif %}</p>
   </footer>
   {% endif %}
   {% if site.quick-search %}<script>" search-js "</script>{% endif %}
@@ -431,9 +431,9 @@ article h5,article h6{font-size:1rem}
   (selmer/parse selmer/parse-input (java.io.StringReader. s)))
 
 (def ^:dynamic ^:private *templates*
-  "Map of template name → compiled selmer template. Bound once per
-   build: selmer/render re-parses its string argument on every call,
-   which dominated build time before templates were compiled upfront."
+  "Map of template name → compiled selmer template. Bound once per build:
+  selmer/render re-parses its string argument on every call, which
+  dominated build time before templates were compiled upfront."
   nil)
 
 (defn- compile-templates []
@@ -473,8 +473,8 @@ article h5,article h6{font-size:1rem}
 
 (defn- collect-page-features
   "Walk the AST once to collect per-page render flags:
-   - :has-code / :hl-langs  — src-block languages for highlight.js
-   - :has-math              — any LaTeX fragment or environment (triggers MathJax)"
+   - :has-code / :hl-langs  - src-block languages for highlight.js
+   - :has-math              - any LaTeX fragment or environment (triggers MathJax)"
   [ast]
   (let [langs (volatile! #{})
         math? (volatile! false)]
@@ -508,8 +508,8 @@ article h5,article h6{font-size:1rem}
       (str/replace "\"" "&quot;")))
 
 (defn- normalize-rel-path
-  "Collapse '.' and '..' segments in a relative path string. Leading
-   '..' segments that cannot be resolved are kept."
+  "Collapse '.' and '..' segments in a relative path string. Leading '..'
+  segments that cannot be resolved are kept."
   [path]
   (->> (str/split path #"/")
        (reduce (fn [acc part]
@@ -524,7 +524,7 @@ article h5,article h6{font-size:1rem}
 
 (defn- resolve-rel-against-source
   "Resolve a relative path against the current source file's directory,
-   returning a normalized path relative to *input-dir*."
+  returning a normalized path relative to *input-dir*."
   [target]
   (if-let [src *current-source-file*]
     (let [rel (str (fs/relativize *input-dir* src))
@@ -535,7 +535,7 @@ article h5,article h6{font-size:1rem}
 
 (defn- org-target->url
   "Convert a file:foo.org target into a slug URL. Relative targets
-   resolve against the current source file first."
+  resolve against the current source file first."
   [target]
   (let [resolved (if (str/starts-with? target "/")
                    (subs target 1)
@@ -550,15 +550,15 @@ article h5,article h6{font-size:1rem}
     (if section (str lp "/" section "/" slug "/") (str lp "/" slug "/"))))
 
 (defn- resolve-file-url
-  "Rewrite file: links: .org targets become slug URLs, static/ paths
-   are stripped, and relative assets become site-absolute URLs anchored
-   at the current source file."
+  "Rewrite file: links: .org targets become slug URLs, static/ paths are
+  stripped, and relative assets become site-absolute URLs anchored at
+  the current source file."
   [node]
   (if (not= :file (:link-type node))
     (:url node)
     (let [target (:target node)]
       (cond
-        ;; file:https://… — the target is really a URL; pass it through
+        ;; file:https://... - the target is really a URL; pass it through
         (re-find #"^[a-z][a-z0-9+.-]*://" target)
         target
         (str/ends-with? target ".org")
@@ -575,8 +575,8 @@ article h5,article h6{font-size:1rem}
 
 (defn- image-link?
   "True when a link node points at an image, and so renders as <img>.
-   Tested on the raw target: resolving a file: link never changes its
-   extension, so the verdict holds before and after resolution."
+  Tested on the raw target: resolving a file: link never changes its
+  extension, so the verdict holds before and after resolution."
   [node]
   (boolean (re-find image-ext-re (or (:target node) (:url node) ""))))
 
@@ -586,8 +586,8 @@ article h5,article h6{font-size:1rem}
 
 (def ^:dynamic ^:private *excluded-tags*
   "Headline tags whose subtree is dropped before rendering. Mirrors
-   Emacs' `org-export-exclude-tags`. Overridable via config.edn's
-   :exclude-tags key."
+  Emacs' `org-export-exclude-tags`. Overridable via config.edn's
+  :exclude-tags key."
   #{"noexport"})
 
 (defn- excluded-section? [node]
@@ -595,7 +595,8 @@ article h5,article h6{font-size:1rem}
        (some *excluded-tags* (:tags node))))
 
 (defn- prune-excluded-sections
-  "Recursively drop :section children whose :tags intersect *excluded-tags*."
+  "Recursively drop :section children whose :tags intersect
+  *excluded-tags*."
   [node]
   (if-let [children (:children node)]
     (assoc node :children
@@ -604,7 +605,7 @@ article h5,article h6{font-size:1rem}
 
 (def ^:private ignored-root-files
   "Files orgy owns that must never leak into the output. Users keep
-   unrelated tooling out via directory layout or --skip-dirs."
+  unrelated tooling out via directory layout or --skip-dirs."
   #{"config.edn"})
 
 (defn- iso->rfc822
@@ -612,9 +613,10 @@ article h5,article h6{font-size:1rem}
   [iso-date]
   (when iso-date
     (try
-      (let [dt (java.time.LocalDate/parse iso-date)
-            zdt (.atStartOfDay dt (java.time.ZoneOffset/UTC))]
-        (.format zdt (java.time.format.DateTimeFormatter/ofPattern "EEE, dd MMM yyyy HH:mm:ss Z" java.util.Locale/ENGLISH)))
+      (-> (java.time.LocalDate/parse iso-date)
+          (.atStartOfDay java.time.ZoneOffset/UTC)
+          (.format (java.time.format.DateTimeFormatter/ofPattern
+                    "EEE, dd MMM yyyy HH:mm:ss Z" java.util.Locale/ENGLISH)))
       (catch Exception _ iso-date))))
 
 ;; ---------------------------------------------------------------------------
@@ -641,25 +643,25 @@ article h5,article h6{font-size:1rem}
   "Render a vector of organ inline nodes to HTML."
   [nodes]
   (when (seq nodes)
-    (str/join
-     (map (fn [node]
-            (let [t (:type node)]
-              (cond
-                (= t :text)            (escape-html (:value node))
-                (inline-wrap t)        (let [tag (inline-wrap t)]
-                                         (str "<" tag ">" (render-inline (:children node)) "</" tag ">"))
-                (#{:code :verbatim} t) (str "<code>" (escape-html (:value node)) "</code>")
-                (= t :link)            (render-link node)
-                (= t :footnote-ref)    (let [l (escape-html (:label node))]
-                                         (str "<sup><a href=\"#fn-" l "\" id=\"fnref-" l "\">" l "</a></sup>"))
-                (= t :timestamp)       (:raw node)
-                (= t :latex-fragment)  (let [v (escape-html (:value node))]
-                                         (case (:kind node)
-                                           (:paren :dollar)    (str "\\(" v "\\)")
-                                           (:bracket :dollars) (str "\\[" v "\\]")
-                                           v))
-                :else                  "")))
-          nodes))))
+    (->> nodes
+         (map (fn [node]
+                (let [t (:type node)]
+                  (cond
+                    (= t :text)            (escape-html (:value node))
+                    (inline-wrap t)        (let [tag (inline-wrap t)]
+                                             (str "<" tag ">" (render-inline (:children node)) "</" tag ">"))
+                    (#{:code :verbatim} t) (str "<code>" (escape-html (:value node)) "</code>")
+                    (= t :link)            (render-link node)
+                    (= t :footnote-ref)    (let [l (escape-html (:label node))]
+                                             (str "<sup><a href=\"#fn-" l "\" id=\"fnref-" l "\">" l "</a></sup>"))
+                    (= t :timestamp)       (:raw node)
+                    (= t :latex-fragment)  (let [v (escape-html (:value node))]
+                                             (case (:kind node)
+                                               (:paren :dollar)    (str "\\(" v "\\)")
+                                               (:bracket :dollars) (str "\\[" v "\\]")
+                                               v))
+                    :else                  ""))))
+         str/join)))
 
 ;; ---------------------------------------------------------------------------
 ;; AST → HTML rendering
@@ -673,11 +675,12 @@ article h5,article h6{font-size:1rem}
 (defn- render-list-items [items ordered?]
   (let [tag (if ordered? "ol" "ul")]
     (str "<" tag ">"
-         (str/join (map (fn [item]
-                          (str "<li>" (render-inline (:content item))
-                               (when-let [kids (:children item)] (render-children kids))
-                               "</li>"))
-                        items))
+         (->> items
+              (map (fn [item]
+                     (str "<li>" (render-inline (:content item))
+                          (when-let [kids (:children item)] (render-children kids))
+                          "</li>")))
+              str/join)
          "</" tag ">")))
 
 (defn- render-table [{:keys [rows has-header]}]
@@ -694,7 +697,9 @@ article h5,article h6{font-size:1rem}
 (defn- attrs-str
   "Serialize a map of HTML attributes to a leading-space-prefixed string."
   [attrs]
-  (str/join (map (fn [[k v]] (str " " (name k) "=\"" (escape-html v) "\"")) attrs)))
+  (->> attrs
+       (map (fn [[k v]] (str " " (name k) "=\"" (escape-html v) "\"")))
+       str/join))
 
 (defn- html-attrs [node] (attrs-str (get-in node [:affiliated :attr :html])))
 
@@ -758,10 +763,11 @@ article h5,article h6{font-size:1rem}
                     (str "<pre>" (escape-html (:content node)) "</pre>"))
     :list         (if (:description node)
                     (str "<dl>"
-                         (str/join (map (fn [it]
-                                          (str "<dt>" (render-inline (:term it)) "</dt>"
-                                               "<dd>" (render-inline (:definition it)) "</dd>"))
-                                        (:items node)))
+                         (->> (:items node)
+                              (map (fn [it]
+                                     (str "<dt>" (render-inline (:term it)) "</dt>"
+                                          "<dd>" (render-inline (:definition it)) "</dd>")))
+                              str/join)
                          "</dl>")
                     (render-list-items (:items node) (:ordered node)))
     :table        (render-table node)
@@ -789,8 +795,8 @@ article h5,article h6{font-size:1rem}
 
 (def ^:private text-opts
   "A bare image link renders as <img>, so its URL is never read on the
-   page: drop it from extracted text. A bare non-image link renders as
-   its own URL, so keep it."
+  page: drop it from extracted text. A bare non-image link renders as
+  its own URL, so keep it."
   {:bare-link #(when-not (image-link? %) (:url %))})
 
 (defn- node->text
@@ -805,7 +811,9 @@ article h5,article h6{font-size:1rem}
     :quote-block  (children-text (:children node))
     (:src-block :fixed-width) (:content node)
     :block        (if (= :export (:block-type node)) "" (:content node))
-    :table        (str/join " " (mapcat (fn [row] (map #(organ/inline-text % text-opts) row)) (:rows node)))
+    :table        (->> (:rows node)
+                       (mapcat (fn [row] (map #(organ/inline-text % text-opts) row)))
+                       (str/join " "))
     :footnote-def (organ/inline-text (:content node) text-opts)
     (:comment :drawer :html-line :latex-line :latex-environment) ""
     (if (:children node) (children-text (:children node)) "")))
@@ -872,8 +880,8 @@ article h5,article h6{font-size:1rem}
 
 (defn- load-post
   "Parse a pre-scanned org file into a full post map. :html and
-   :plain-text are rendered here, once, so feeds, descriptions and
-   the search index don't re-render the AST."
+  :plain-text are rendered here, once, so feeds, descriptions and the
+  search index don't re-render the AST."
   [scanned]
   (let [{:keys [path lang tags text]} scanned
         ast      (prune-excluded-sections (organ/parse-org text))
@@ -906,15 +914,15 @@ article h5,article h6{font-size:1rem}
   "List all org files from content root, excluding hidden/ignored dirs."
   []
   (let [root *input-dir*]
-    (->> (distinct (concat (fs/glob root "*.org")
-                           (fs/glob root "**/*.org")))
+    (->> (concat (fs/glob root "*.org") (fs/glob root "**/*.org"))
+         distinct
          (filter #(fs/regular-file? %))
          (remove #(str/starts-with? (str (fs/file-name %)) "."))
          (remove #(in-ignored-dir? root %)))))
 
 (defn- load-posts
-  "Parse pre-scanned org files into post maps, excluding drafts.
-   Expects output of prescan-org-file."
+  "Parse pre-scanned org files into post maps, excluding drafts. Expects
+  output of prescan-org-file."
   [scanned-files]
   (->> scanned-files
        (remove #(index-file? (:path %)))
@@ -928,8 +936,8 @@ article h5,article h6{font-size:1rem}
 
 (defn- build-menu
   "Build the nav menu for a given language. :menu may be a vector
-   (shared) or a map keyed by language. When absent, all root pages
-   and sections are shown."
+  (shared) or a map keyed by language. When absent, all root pages and
+  sections are shown."
   [lang posts sections langs config]
   (let [lp         (lang-prefix lang)
         menu-cfg   (let [m (:menu config)]
@@ -946,7 +954,9 @@ article h5,article h6{font-size:1rem}
                                           :description (str/capitalize s)
                                           :slug s})))
         page-links (if menu-cfg
-                     (let [by-slug (into {} (map (juxt :slug identity) (concat root-pages sec-links)))]
+                     (let [by-slug (->> (concat root-pages sec-links)
+                                        (map (juxt :slug identity))
+                                        (into {}))]
                        (->> menu-cfg
                             (keep #(if (map? %) (select-keys % [:url :description]) (by-slug %)))
                             vec))
@@ -977,9 +987,9 @@ article h5,article h6{font-size:1rem}
   (when-let [base (not-empty (:base-url config))] (str base url)))
 
 (defn- page-title
-  "Root-level pages have their first char upper-cased so lowercase
-   nav slugs read as proper page headings. Section posts keep their
-   title verbatim."
+  "Root-level pages have their first char upper-cased so lowercase nav
+  slugs read as proper page headings. Section posts keep their title
+  verbatim."
   [post]
   (let [t (or (:title post) "")]
     (if (or (:section post) (empty? t))
@@ -1008,8 +1018,8 @@ article h5,article h6{font-size:1rem}
                  (render-page "post.html" ctx))))
 
 (defn- render-list!
-  "Render the index page for a (non-nil) section. The root index
-   goes through render-index! instead."
+  "Render the index page for a (non-nil) section. The root index goes
+  through render-index! instead."
   [config lang section posts menu]
   (write-file! (str *output-dir* (lang-prefix lang) "/" section "/index.html")
                (render-page "list.html"
@@ -1051,18 +1061,20 @@ article h5,article h6{font-size:1rem}
                (render-page "tags-index.html"
                             (merge (site-context config lang)
                                    {:menu menu
-                                    :tags (map (fn [[t n]] {:tag t :count n})
-                                               (sort-by first tag-counts))}))))
+                                    :tags (->> tag-counts
+                                               (sort-by first)
+                                               (map (fn [[t n]] {:tag t :count n})))}))))
 
 
 (defn- absolutize-urls
-  "Prefix root-relative href= and src= attributes with base-url so
-   feed content remains valid when aggregated outside the site.
-   Already-absolute URLs (http://, https://, mailto:, #-fragments)
-   are left untouched. The second replace is a safety net for
-   attribute values that happen to be bare relative paths — in
-   practice orgy always emits site-rooted URLs, but hand-written
-   #+html: snippets may not."
+  "Prefix root-relative href= and src= attributes with base-url so feed
+  content remains valid when aggregated outside the site.
+
+  Already-absolute URLs (http://, https://, mailto:, #-fragments) are
+  left untouched. The second replace is a safety net for attribute
+  values that happen to be bare relative paths - in practice orgy
+  always emits site-rooted URLs, but hand-written #+html: snippets may
+  not."
   [html base-url]
   (-> html
       (str/replace #"((?:href|src)=\")/" (str "$1" base-url "/"))
@@ -1090,17 +1102,18 @@ article h5,article h6{font-size:1rem}
        (write-file! out-path xml)))))
 
 (defn- render-search-index!
-  "Write a single site-wide /search.json covering every language, so
-   the quick search finds content regardless of the page's language."
+  "Write a single site-wide /search.json covering every language, so the
+  quick search finds content regardless of the page's language."
   [posts]
   ;; Short keys minimize search.json payload: :t title, :u url,
   ;; :d date, :b body, :g tags, :l lang (multilingual only).
-  (let [entries (map (fn [p]
-                       (cond-> {:t (:title p) :u (:url p) :d (:date p)
-                                :b (truncate (:plain-text p) search-body-max-chars)}
-                         (seq (:tags p))    (assoc :g (str/join " " (:tags p)))
-                         (not *monolingual*) (assoc :l (:lang p))))
-                     (sort-by :date date-desc posts))]
+  (let [entries (->> posts
+                     (sort-by :date date-desc)
+                     (map (fn [p]
+                            (cond-> {:t (:title p) :u (:url p) :d (:date p)
+                                     :b (truncate (:plain-text p) search-body-max-chars)}
+                              (seq (:tags p))     (assoc :g (str/join " " (:tags p)))
+                              (not *monolingual*) (assoc :l (:lang p))))))]
     (write-file! (str *output-dir* "/search.json")
                  (json/generate-string entries))))
 
@@ -1128,9 +1141,9 @@ article h5,article h6{font-size:1rem}
       (write-file! (str *output-dir* "/sitemap.xml") xml))))
 
 (defn- copy-file-if-changed!
-  "Copy src to dest unless dest already exists with the same size and
-   an mtime at least as recent as src — keeps rebuild I/O proportional
-   to what actually changed."
+  "Copy src to dest unless dest already exists with the same size and an
+  mtime at least as recent as src - keeps rebuild I/O proportional to
+  what actually changed."
   [src dest]
   (when (or (not (fs/exists? dest))
             (not= (fs/size src) (fs/size dest))
@@ -1148,13 +1161,14 @@ article h5,article h6{font-size:1rem}
 
 (defn- copy-assets!
   "Copy non-org files from content root to output, preserving paths.
-   Skips static/, public/, templates/, .git/, config files, hidden
-   files, and files shadowed by static/ (static/ is authoritative
-   for a given output path)."
+  Skips static/, public/, templates/, .git/, config files, hidden
+  files, and files shadowed by static/ (static/ is authoritative for a
+  given output path)."
   []
   (let [root       *input-dir*
         static-dir (str root "/static")]
-    (doseq [file (->> (distinct (concat (fs/glob root "*") (fs/glob root "**/*")))
+    (doseq [file (->> (concat (fs/glob root "*") (fs/glob root "**/*"))
+                      distinct
                       (filter fs/regular-file?)
                       (remove #(str/ends-with? (str %) ".org"))
                       (remove #(str/starts-with? (str (fs/file-name %)) "."))
@@ -1166,8 +1180,8 @@ article h5,article h6{font-size:1rem}
           (copy-file-if-changed! file dest))))))
 
 (defn- detect-monolingual?
-  "Return true when there is no indication of multiple languages.
-   Uses pre-scanned metadata to avoid re-reading files."
+  "Return true when there is no indication of multiple languages. Uses
+  pre-scanned metadata to avoid re-reading files."
   [config scanned-files]
   (and (<= (count (:languages config)) 1)
        (not (map? (:menu config)))
@@ -1175,8 +1189,8 @@ article h5,article h6{font-size:1rem}
 
 (defn- resolve-languages
   "Decide which languages to render. Explicit config wins and is
-   unioned with post-inferred languages; otherwise we infer from posts;
-   and as a last resort fall back to [\"en\"]."
+   unioned with post-inferred languages; otherwise we infer from
+  posts; and as a last resort fall back to [\"en\"]."
   [config posts]
   (let [from-cfg   (seq (:languages config))
         from-posts (seq (distinct (map :lang posts)))]
@@ -1186,8 +1200,8 @@ article h5,article h6{font-size:1rem}
       :else      ["en"])))
 
 (defn- group-posts-by-tag
-  "Build a {tag [posts…]} map for a language's posts, each tag's
-   posts sorted newest-first."
+  "Build a {tag [posts…]} map for a language's posts, each tag's posts
+  sorted newest-first."
   [posts]
   (->> posts
        (mapcat (fn [p] (map #(vector % p) (:tags p))))
@@ -1198,7 +1212,7 @@ article h5,article h6{font-size:1rem}
 
 (defn- render-posts-in-section!
   "Render every post in a section, wiring prev/next links within the
-   section. Posts are newest-first, so prev=newer and next=older."
+  section. Posts are newest-first, so prev=newer and next=older."
   [config menu section sec-posts]
   (let [sec-vec (vec sec-posts)]
     (dotimes [i (count sec-vec)]
@@ -1209,8 +1223,8 @@ article h5,article h6{font-size:1rem}
                     (when section (get sec-vec (inc i)))))))
 
 (defn- render-tags!
-  "Render tag pages, per-tag RSS feeds and the tags index for a
-   language. No-op if no post has any tag."
+  "Render tag pages, per-tag RSS feeds and the tags index for a language.
+  No-op if no post has any tag."
   [config lang lang-posts menu]
   (let [tag-groups (group-posts-by-tag lang-posts)]
     (when (seq tag-groups)
@@ -1223,8 +1237,8 @@ article h5,article h6{font-size:1rem}
                           menu))))
 
 (defn- render-language!
-  "Render everything that belongs to a single language: posts,
-   main index, section indexes, tag pages and RSS feed."
+  "Render everything that belongs to a single language: posts, main
+  index, section indexes, tag pages and RSS feed."
   [config lang posts sections langs]
   (let [lang-posts (filter #(= (:lang %) lang) posts)
         menu       (build-menu lang lang-posts sections langs config)]
@@ -1238,9 +1252,9 @@ article h5,article h6{font-size:1rem}
     (render-feed! config lang lang-posts)))
 
 (defn- render-root-redirect!
-  "In multilingual mode, write a minimal /index.html that redirects
-   to the first matching navigator language, falling back to the first
-   configured language via <meta refresh>. No-op in monolingual mode."
+  "In multilingual mode, write a minimal /index.html that redirects to
+  the first matching navigator language, falling back to the first
+  configured language via <meta refresh>. No-op in monolingual mode."
   [langs]
   (when-not *monolingual*
     (let [html (render-template "redirect.html"
@@ -1249,10 +1263,10 @@ article h5,article h6{font-size:1rem}
       (write-file! (str *output-dir* "/index.html") html))))
 
 (defn- copy-all-assets!
-  "Copy user-provided files to the output directory. Non-org files
-   from the content tree are copied first, then the static/ directory
-   is overlaid — static/ is authoritative for site-wide assets
-   (favicon, robots.txt, custom CSS…) and wins on conflict."
+  "Copy user-provided files to the output directory. Non-org files from
+  the content tree are copied first, then the static/ directory is
+  overlaid - static/ is authoritative for site-wide assets (favicon,
+  robots.txt, custom CSS…) and wins on conflict."
   []
   (copy-assets!)
   (copy-static!))
@@ -1288,13 +1302,14 @@ article h5,article h6{font-size:1rem}
                             " (" n-pages " page" (when (> n-pages 1) "s") ")")))))))))
 
 (defn- source-fingerprint
-  "Return a map of path→last-modified-ms for every file under
-   input-dir that would contribute to a build. Hidden files, the
-   output directory, and any directory in *ignored-dirs* are excluded
-   — so --skip-dirs entries do not trigger spurious rebuilds."
+  "Return a map of path→last-modified-ms for every file under input-dir
+  that would contribute to a build. Hidden files, the output
+  directory, and any directory in *ignored-dirs* are excluded - so
+  --skip-dirs entries do not trigger spurious rebuilds."
   [input-dir output-dir]
   (let [out-abs (str (fs/canonicalize output-dir) "/")]
-    (->> (distinct (concat (fs/glob input-dir "**/*") (fs/glob input-dir "*")))
+    (->> (concat (fs/glob input-dir "**/*") (fs/glob input-dir "*"))
+         distinct
          (filter fs/regular-file?)
          (remove #(str/starts-with? (str (fs/canonicalize %)) out-abs))
          (remove #(str/starts-with? (str (fs/file-name %)) "."))
@@ -1331,7 +1346,10 @@ article h5,article h6{font-size:1rem}
 (defn- serve-request [out-dir socket]
   (with-open [s socket]
     (let [out   (.getOutputStream s)
-          line  (.readLine (java.io.BufferedReader. (java.io.InputStreamReader. (.getInputStream s))))
+          line  (-> (.getInputStream s)
+                    java.io.InputStreamReader.
+                    java.io.BufferedReader.
+                    .readLine)
           path  (when line (second (str/split line #"\s+")))
           fpath (str (fs/normalize
                       (str out-dir (if (str/ends-with? (or path "") "/")
@@ -1346,8 +1364,8 @@ article h5,article h6{font-size:1rem}
 
 (defn serve!
   "Build, start a simple HTTP server, and watch for file changes.
-   Requests are served sequentially on a single daemon thread —
-   fine for local preview, not for production traffic."
+  Requests are served sequentially on a single daemon thread - fine
+  for local preview, not for production traffic."
   [{:keys [port overrides] :or {port default-serve-port}}]
   (let [opts    (or overrides {})
         out-dir (str (fs/absolutize (or (:output-dir opts) "public")))
@@ -1447,9 +1465,9 @@ Options:")
 (defn- ->overrides
   "Keep only the keys that represent user-provided overrides for load-config."
   [opts]
-  (-> opts
-      (select-keys [:input-dir :output-dir :config-path :theme :skip-dirs])
-      (as-> m (into {} (remove #(nil? (val %)) m)))))
+  (->> (select-keys opts [:input-dir :output-dir :config-path :theme :skip-dirs])
+       (remove (comp nil? val))
+       (into {})))
 
 (defn- bbin-version
   "Version string read from bbin's install metadata (`bbin ls --edn`), or nil
@@ -1459,9 +1477,10 @@ Options:")
     (let [{:keys [out exit]} (process/shell {:out :string :err :string :continue true}
                                             "bbin" "ls" "--edn")]
       (when (zero? exit)
-        (some (fn [e] (when (= 'io.github.bzg/orgy (:lib e))
-                        (get-in e [:coords :git/tag])))
-              (vals (edn/read-string out)))))
+        (->> (edn/read-string out)
+             vals
+             (some (fn [e] (when (= 'io.github.bzg/orgy (:lib e))
+                             (get-in e [:coords :git/tag])))))))
     (catch Exception _ nil)))
 
 (defn -main [& args]

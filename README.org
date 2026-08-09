@@ -56,7 +56,7 @@ You can also check this tutorial: [[https://bzg.fr/en/notes/orgy-tutorial/][Get 
 
 Once =orgy serve= launches the server, open [[http://localhost:1888]] in to
 preview the site. The server rebuilds automatically when you edit your
-org files — just refresh the page to see the changes. Use =serve PORT=
+org files - just refresh the page to see the changes. Use =serve PORT=
 to pick a different port (e.g. =orgy -i myblog serve 3000=).
 
 * Example directory layout
@@ -154,14 +154,14 @@ All keys in =config.edn= are optional:
 | =:copyright=    | =""=             | Footer copyright notice                               |
 | =:languages=    | /inferred/       | Languages to render; inferred from posts when omitted |
 | =:menu=         | /all/            | Ordered list of nav entries (see below)               |
-| =:theme=        | /none/           | CSS theme (name, URL, or path — see CLI section)      |
+| =:theme=        | /none/           | CSS theme (name, URL, or path - see CLI section)      |
 | =:quick-search= | =false=          | Enable client-side quick search (all languages)       |
 | =:theme-toggle= | =false=          | Show a light/dark theme toggle in the nav bar         |
 
 When =:languages= is omitted, orgy infers the language set from post
-filenames (=post.fr.org= → =fr=) and =#+language:= headers, falling
-back to =["en"]= only when nothing is detected — so an all-French
-blog never gets a phantom English subtree.
+filenames (=post.fr.org= → =fr=) and =#+language:= headers, falling back to
+=["en"]= only when nothing is detected - so an all-French blog never
+gets a phantom English subtree.
 
 ** Menu configuration
 
