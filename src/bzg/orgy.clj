@@ -573,6 +573,13 @@ article h5,article h6{font-size:1rem}
 
 (def ^:private image-ext-re #"\.(?:png|jpg|jpeg|gif|svg|webp)$")
 
+(defn- image-link?
+  "True when a link node points at an image, and so renders as <img>.
+   Tested on the raw target: resolving a file: link never changes its
+   extension, so the verdict holds before and after resolution."
+  [node]
+  (boolean (re-find image-ext-re (or (:target node) (:url node) ""))))
+
 (def ^:dynamic ^:private *ignored-dirs*
   "Directories to skip when scanning for content."
   #{"static" "public" "templates" ".git"})
@@ -622,7 +629,7 @@ article h5,article h6{font-size:1rem}
 (defn- render-link [node]
   (let [url (or (resolve-file-url node) "")
         e   escape-html]
-    (if (re-find image-ext-re url)
+    (if (image-link? node)
       (let [alt (or (organ/inline-text (:children node)) "")]
         (str "<img src=\"" (e url) "\" alt=\"" (e alt) "\""
              (when (str/blank? alt) " role=\"presentation\"") ">"))
@@ -722,7 +729,7 @@ article h5,article h6{font-size:1rem}
         ;; Standalone image link → <img>/<figure>
         (and (= 1 (count c))
              (= :link (:type (first c)))
-             (re-find image-ext-re (or (:target (first c)) (:url (first c)) "")))
+             (image-link? (first c)))
         (render-image (first c) attrs caption)
         ;; Regular paragraph
         :else (str "<p" (html-attrs node) ">" (render-inline c) "</p>"))
@@ -780,20 +787,26 @@ article h5,article h6{font-size:1rem}
 (defn- children-text [nodes]
   (str/join " " (map node->text nodes)))
 
+(def ^:private text-opts
+  "A bare image link renders as <img>, so its URL is never read on the
+   page: drop it from extracted text. A bare non-image link renders as
+   its own URL, so keep it."
+  {:bare-link #(when-not (image-link? %) (:url %))})
+
 (defn- node->text
   "Extract plain text from an AST node, recursing into children."
   [node]
   (case (:type node)
-    :paragraph    (let [text (organ/inline-text (:content node))]
+    :paragraph    (let [text (organ/inline-text (:content node) text-opts)]
                     (if (and text (re-matches org-keyword-re text)) "" (or text "")))
-    :section      (str (organ/inline-text (:title node)) " " (children-text (:children node)))
+    :section      (str (organ/inline-text (:title node) text-opts) " " (children-text (:children node)))
     :list         (children-text (:items node))
-    :list-item    (str (organ/inline-text (:content node)) " " (children-text (:children node)))
+    :list-item    (str (organ/inline-text (:content node) text-opts) " " (children-text (:children node)))
     :quote-block  (children-text (:children node))
     (:src-block :fixed-width) (:content node)
     :block        (if (= :export (:block-type node)) "" (:content node))
-    :table        (str/join " " (mapcat (fn [row] (map organ/inline-text row)) (:rows node)))
-    :footnote-def (organ/inline-text (:content node))
+    :table        (str/join " " (mapcat (fn [row] (map #(organ/inline-text % text-opts) row)) (:rows node)))
+    :footnote-def (organ/inline-text (:content node) text-opts)
     (:comment :drawer :html-line :latex-line :latex-environment) ""
     (if (:children node) (children-text (:children node)) "")))
 
