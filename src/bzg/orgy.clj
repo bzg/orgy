@@ -150,7 +150,7 @@ article h5,article h6{font-size:1rem}
 .search-results{position:absolute;right:0;top:100%;background:var(--pico-background-color);border:1px solid var(--pico-muted-border-color);border-radius:4px;max-height:60vh;overflow-y:auto;width:320px;z-index:10;display:none;margin-top:.25em;padding:0;list-style:none}
 .search-results li a{display:block;padding:.5em .75em;text-decoration:none}
 .search-results li a:hover{background:var(--pico-primary-focus)}
-.search-results li time{font-size:.8em;opacity:.6;margin-left:.5em}
+.search-results li time,.search-results li .search-lang{font-size:.8em;opacity:.6;margin-left:.5em}
 .visually-hidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 {% endif %}
 {% if site.theme-toggle %}
@@ -170,7 +170,7 @@ article h5,article h6{font-size:1rem}
   }
   function load(cb){
     if (idx) return cb();
-    fetch('{{lang-prefix}}/search.json')
+    fetch('/search.json')
       .then(function(r){ return r.json(); })
       .then(function(d){ idx = d; cb(); });
   }
@@ -185,6 +185,7 @@ article h5,article h6{font-size:1rem}
     list.innerHTML = hits.map(function(p){
       return '<li role=\"option\"><a href=\"' + esc(p.u) + '\">'
            + esc(p.t || '')
+           + (p.l ? '<small class=\"search-lang\">' + esc(p.l.toUpperCase()) + '</small>' : '')
            + (p.d ? '<time>' + esc(p.d) + '</time>' : '')
            + '</a></li>';
     }).join('');
@@ -1074,15 +1075,19 @@ article h5,article h6{font-size:1rem}
            xml (render-template "feed.xml" ctx)]
        (write-file! out-path xml)))))
 
-(defn- render-search-index! [lang posts]
+(defn- render-search-index!
+  "Write a single site-wide /search.json covering every language, so
+   the quick search finds content regardless of the page's language."
+  [posts]
   ;; Short keys minimize search.json payload: :t title, :u url,
-  ;; :d date, :b body.
+  ;; :d date, :b body, :l lang (multilingual only).
   (let [entries (map (fn [p]
-                       {:t (:title p) :u (:url p) :d (:date p)
-                        :b (truncate (:plain-text p) search-body-max-chars)})
-                     posts)
-        out     (str *output-dir* (lang-prefix lang) "/search.json")]
-    (write-file! out (json/generate-string entries))))
+                       (cond-> {:t (:title p) :u (:url p) :d (:date p)
+                                :b (truncate (:plain-text p) search-body-max-chars)}
+                         (not *monolingual*) (assoc :l (:lang p))))
+                     (sort-by :date date-desc posts))]
+    (write-file! (str *output-dir* "/search.json")
+                 (json/generate-string entries))))
 
 (defn- render-sitemap! [config posts langs]
   (when-let [base (not-empty (:base-url config))]
@@ -1204,7 +1209,7 @@ article h5,article h6{font-size:1rem}
 
 (defn- render-language!
   "Render everything that belongs to a single language: posts,
-   main index, section indexes, tag pages, RSS feed, and search index."
+   main index, section indexes, tag pages and RSS feed."
   [config lang posts sections langs]
   (let [lang-posts (filter #(= (:lang %) lang) posts)
         menu       (build-menu lang lang-posts sections langs config)]
@@ -1215,9 +1220,7 @@ article h5,article h6{font-size:1rem}
             :when section]
       (render-list! config lang section sec-posts menu))
     (render-tags! config lang lang-posts menu)
-    (render-feed! config lang lang-posts)
-    (when (:quick-search config)
-      (render-search-index! lang lang-posts))))
+    (render-feed! config lang lang-posts)))
 
 (defn- render-root-redirect!
   "In multilingual mode, write a minimal /index.html that redirects
@@ -1262,6 +1265,8 @@ article h5,article h6{font-size:1rem}
               (doseq [lang langs]
                 (render-language! config lang posts sections langs))
               (render-root-redirect! langs)
+              (when (:quick-search config)
+                (render-search-index! posts))
               (render-sitemap! config posts langs)
               (copy-all-assets!)
               (println (str "Site built in " *output-dir*

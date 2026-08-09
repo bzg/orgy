@@ -155,7 +155,7 @@ All keys in =config.edn= are optional:
 | =:languages=    | /inferred/       | Languages to render; inferred from posts when omitted |
 | =:menu=         | /all/            | Ordered list of nav entries (see below)               |
 | =:theme=        | /none/           | CSS theme (name, URL, or path — see CLI section)      |
-| =:quick-search= | =false=          | Enable client-side quick search                       |
+| =:quick-search= | =false=          | Enable client-side quick search (all languages)       |
 | =:theme-toggle= | =false=          | Show a light/dark theme toggle in the nav bar         |
 
 When =:languages= is omitted, orgy infers the language set from post
@@ -203,8 +203,8 @@ Templates use [[https://github.com/yogthos/Selmer][Selmer]] syntax. Template var
 
 ** Monolingual (default)
 
-When no multilingual indicator is detected (no =:languages= with multiple
-entries, no =:menu= map, no =.xx.org= file suffixes, no distinct
+When no multilingual indicator is detected (no =:languages= with
+multiple entries, no =:menu= map, no =.xx.org= file suffixes, no distinct
 =#+language:= headers), pages are generated directly under =public/=:
 
 #+begin_example
@@ -227,17 +227,17 @@ public/
 
 ** Multilingual
 
-When multiple languages are detected, each language gets its own subtree
-and a root =index.html= redirects to the first language:
+When multiple languages are detected, each language gets its own
+subtree and a root =index.html= redirects to the first language:
 
 #+begin_example
 public/
   index.html              # redirect to first language
+  search.json             # site-wide search index (when :quick-search is true)
   sitemap.xml             # generated when base-url is set
   en/
     index.html            # homepage
     feed.xml              # RSS feed
-    search.json           # search index (when :quick-search is true)
     notes/
       index.html          # section listing
       my-post/
@@ -263,11 +263,12 @@ You can also [[mailto:bzg@bzg.fr][send me an email]] and support my work on [[ht
 
 * Intentional Versioning
 
-This project uses [[https://intver.org][Intentional Versioning]], here are the three audiences:
+This project uses [[https://intver.org][Intentional Versioning]], here are the three
+audiences:
 
-- =Users= : end users who publish static website with orgy
-- =Integrators= : external packagers
-- =Maintainers= : maintainers of the codebase
+- =Users=: end users who publish static website with orgy
+- =Integrators=: external packagers
+- =Maintainers=: maintainers of the codebase
 
 * Support the Clojure(script) ecosystem
 
