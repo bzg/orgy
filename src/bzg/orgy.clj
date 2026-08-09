@@ -179,6 +179,7 @@ article h5,article h6{font-size:1rem}
     var lq = q.toLowerCase(),
         hits = idx.filter(function(p){
           return (p.t && p.t.toLowerCase().indexOf(lq) >= 0)
+              || (p.g && p.g.toLowerCase().indexOf(lq) >= 0)
               || (p.b && p.b.toLowerCase().indexOf(lq) >= 0);
         }).slice(0, 15);
     if (!hits.length) { list.style.display = 'none'; return; }
@@ -1080,10 +1081,11 @@ article h5,article h6{font-size:1rem}
    the quick search finds content regardless of the page's language."
   [posts]
   ;; Short keys minimize search.json payload: :t title, :u url,
-  ;; :d date, :b body, :l lang (multilingual only).
+  ;; :d date, :b body, :g tags, :l lang (multilingual only).
   (let [entries (map (fn [p]
                        (cond-> {:t (:title p) :u (:url p) :d (:date p)
                                 :b (truncate (:plain-text p) search-body-max-chars)}
+                         (seq (:tags p))    (assoc :g (str/join " " (:tags p)))
                          (not *monolingual*) (assoc :l (:lang p))))
                      (sort-by :date date-desc posts))]
     (write-file! (str *output-dir* "/search.json")
