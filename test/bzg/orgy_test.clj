@@ -3,6 +3,7 @@
   (:require [babashka.fs :as fs]
             [clojure.string :as str]
             [clojure.test :refer [deftest is testing]]
+            [bzg.organ :as organ]
             [bzg.orgy :as orgy]))
 
 ;; Private fns are exercised via their vars.
@@ -21,6 +22,9 @@
 (def escape-html               @#'orgy/escape-html)
 (def iso->rfc822               @#'orgy/iso->rfc822)
 (def date-desc                 @#'orgy/date-desc)
+(def meta-str                  @#'orgy/meta-str)
+(def ast->html                 @#'orgy/ast->html)
+(def ast->text                 @#'orgy/ast->text)
 
 ;; ---------------------------------------------------------------------------
 ;; normalize-rel-path
@@ -252,3 +256,32 @@
     (is (= ["fr"] (resolve-languages {} [{:lang "fr"}]))))
   (testing "empty fallback to en"
     (is (= ["en"] (resolve-languages {} [])))))
+
+;; ---------------------------------------------------------------------------
+;; Document metadata and lists, as parsed by organ
+;; ---------------------------------------------------------------------------
+
+(deftest meta-str-test
+  (let [meta (:meta (organ/parse-org (str "#+TITLE: First\n#+TITLE: second\n"
+                                          "#+DATE: <2026-11-05 Thu>\n#+DATE: <2026-11-06 Fri>\n"
+                                          "#+AUTHOR: Me\n")))]
+    (testing "a repeated title is joined with a space"
+      (is (= "First second" (meta-str meta :title))))
+    (testing "a repeated date keeps the first one"
+      (is (= "<2026-11-05 Thu>" (meta-str meta :date))))
+    (testing "a single value is returned as is"
+      (is (= "Me" (meta-str meta :author))))
+    (testing "an absent key gives nil"
+      (is (nil? (meta-str meta :description))))))
+
+(deftest list-html-test
+  (testing "an item with a [@N] cookie restarts the numbering"
+    (is (= "<ol><li>a</li><li value=\"5\">b</li><li>c</li></ol>"
+           (ast->html (organ/parse-org "1. a\n2. [@5] b\n3. c")))))
+  (testing "a description item renders its children in the definition"
+    (is (= "<dl><dt>Term</dt><dd>def<ul><li>sub</li></ul></dd></dl>"
+           (ast->html (organ/parse-org "- Term :: def\n  - sub"))))))
+
+(deftest list-text-test
+  (testing "description items contribute their term and definition"
+    (is (= "Term def sub" (ast->text (organ/parse-org "- Term :: def\n  - sub"))))))

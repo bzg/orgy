@@ -677,7 +677,9 @@ article h5,article h6{font-size:1rem}
     (str "<" tag ">"
          (->> items
               (map (fn [item]
-                     (str "<li>" (render-inline (:content item))
+                     ;; An item with a [@N] cookie (organ's :counter) restarts the numbering
+                     (str "<li" (when-let [n (:counter item)] (str " value=\"" n "\"")) ">"
+                          (render-inline (:content item))
                           (when-let [kids (:children item)] (render-children kids))
                           "</li>")))
               str/join)
@@ -766,7 +768,9 @@ article h5,article h6{font-size:1rem}
                          (->> (:items node)
                               (map (fn [it]
                                      (str "<dt>" (render-inline (:term it)) "</dt>"
-                                          "<dd>" (render-inline (:definition it)) "</dd>")))
+                                          "<dd>" (render-inline (:definition it))
+                                          (when-let [kids (:children it)] (render-children kids))
+                                          "</dd>")))
                               str/join)
                          "</dl>")
                     (render-list-items (:items node) (:ordered node)))
@@ -807,7 +811,11 @@ article h5,article h6{font-size:1rem}
                     (if (and text (re-matches org-keyword-re text)) "" (or text "")))
     :section      (str (organ/inline-text (:title node) text-opts) " " (children-text (:children node)))
     :list         (children-text (:items node))
-    :list-item    (str (organ/inline-text (:content node) text-opts) " " (children-text (:children node)))
+    :list-item    (str (if (:term node)
+                         (str (organ/inline-text (:term node) text-opts) " "
+                              (organ/inline-text (:definition node) text-opts))
+                         (organ/inline-text (:content node) text-opts))
+                       " " (children-text (:children node)))
     :quote-block  (children-text (:children node))
     (:src-block :fixed-width) (:content node)
     :block        (if (= :export (:block-type node)) "" (:content node))
@@ -878,6 +886,16 @@ article h5,article h6{font-size:1rem}
      :draft? draft?
      :text   org-text}))
 
+(defn- meta-str
+  "A :meta value as one string: organ gives a vector for a repeated
+  #+KEY: line. Titles and authors are joined with a space (as organ does
+  for the document title); a post keeps its first date."
+  [meta k]
+  (let [v (get meta k)]
+    (if (vector? v)
+      (if (= k :date) (first v) (str/join " " v))
+      v)))
+
 (defn- load-post
   "Parse a pre-scanned org file into a full post map. :html and
   :plain-text are rendered here, once, so feeds, descriptions and the
@@ -891,11 +909,11 @@ article h5,article h6{font-size:1rem}
         url      (if section
                    (str (lang-prefix lang) "/" section "/" slug "/")
                    (str (lang-prefix lang) "/" slug "/"))]
-    {:title   (:title meta)
-     :date    (when-let [d (:date meta)]
+    {:title   (meta-str meta :title)
+     :date    (when-let [d (meta-str meta :date)]
                 ;; Normalize Org timestamps like <2019-03-28 jeu.> to 2019-03-28
                 (or (second (re-find #"(\d{4}-\d{2}-\d{2})" d)) d))
-     :author  (:author meta)
+     :author  (meta-str meta :author)
      :tags    tags
      :lang    lang
      :slug    slug
@@ -1043,7 +1061,7 @@ article h5,article h6{font-size:1rem}
         (let [ast (prune-excluded-sections (organ/parse-org (slurp index-file)))]
           (write-file! out (render-page "post.html"
                                         (merge ctx (collect-page-features ast)
-                                               {:title       (:title (:meta ast))
+                                               {:title       (meta-str (:meta ast) :title)
                                                 :description (truncate (ast->text ast) description-max-chars)
                                                 :content     (ast->html ast)})))))
       (write-file! out (render-page "list.html"
