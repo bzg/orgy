@@ -763,9 +763,13 @@ article h5,article h6{font-size:1rem}
                          (when lang (str " class=\"language-" lang "\""))
                          ">" (escape-html (:content node)) "</code></pre>"))
     :quote-block  (str "<blockquote>" (render-children (:children node)) "</blockquote>")
-    :block        (if (and (= :export (:block-type node))
-                           (= "html" (some-> (:args node) str/lower-case)))
-                    (:content node)
+    :block        (case (:block-type node)
+                    ;; Comments are never published; an export block is
+                    ;; only meant for its own backend.
+                    :comment ""
+                    :export  (if (= "html" (some-> (:args node) str/lower-case))
+                               (str (:content node))
+                               "")
                     (str "<pre>" (escape-html (:content node)) "</pre>"))
     :list         (if (:description node)
                     (str "<dl>"
@@ -822,7 +826,7 @@ article h5,article h6{font-size:1rem}
                        " " (children-text (:children node)))
     :quote-block  (children-text (:children node))
     (:src-block :fixed-width) (:content node)
-    :block        (if (= :export (:block-type node)) "" (:content node))
+    :block        (if (#{:export :comment} (:block-type node)) "" (:content node))
     :table        (->> (:rows node)
                        (mapcat (fn [row] (map #(organ/inline-text % text-opts) row)))
                        (str/join " "))

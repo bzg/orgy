@@ -167,7 +167,19 @@
 (deftest block-html-test
   (testing "an empty src block renders instead of throwing"
     (is (= "<pre><code></code></pre>"
-           (ast->html (organ/parse-org "#+begin_src\n#+end_src\n"))))))
+           (ast->html (organ/parse-org "#+begin_src\n#+end_src\n")))))
+  (testing "a comment block is never published"
+    (let [ast (organ/parse-org "#+begin_comment\nsecret\n#+end_comment\n")]
+      (is (= "" (ast->html ast)))
+      (is (= "" (ast->text ast)))))
+  (testing "only html export blocks are emitted"
+    (is (= "<b>x</b>"
+           (ast->html (organ/parse-org "#+begin_export html\n<b>x</b>\n#+end_export\n"))))
+    (is (= ""
+           (ast->html (organ/parse-org "#+begin_export latex\n\\newpage\n#+end_export\n")))))
+  (testing "other blocks stay preformatted"
+    (is (= "<pre>&lt;b&gt;</pre>"
+           (ast->html (organ/parse-org "#+begin_example\n<b>\n#+end_example\n"))))))
 
 ;; ---------------------------------------------------------------------------
 ;; build! end to end
