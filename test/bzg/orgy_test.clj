@@ -193,13 +193,19 @@
     (try
       (put "config.edn" (pr-str {:base-url "https://ex.org" :skip-dirs ["drafts"]}))
       (put "notes/a.org" "#+title: A\n#+date: 2024-01-01\n\nHello *world*.\n")
+      (put "notes/photo.jpg" "x")
       (put "drafts/d.org" "#+title: D\n\nDraft.\n")
       (put "drafts/d.txt" "x")
+      ;; Twice: the second build sees the first one's output.
       (with-out-str
+        (orgy/build! {:input-dir root :output-dir out})
         (orgy/build! {:input-dir root :output-dir out}))
       (testing ":skip-dirs from config.edn is honoured"
         (is (fs/exists? (str out "/notes/a/index.html")))
         (is (not (fs/exists? (str out "/drafts")))))
+      (testing "an output dir inside the input dir is not copied into itself"
+        (is (fs/exists? (str out "/notes/photo.jpg")))
+        (is (not (fs/exists? (str out "/out")))))
       (testing "feed content is HTML inside CDATA, not escaped HTML"
         (is (str/includes? (slurp (str out "/feed.xml"))
                            "<![CDATA[<p>Hello <strong>world</strong>.</p>]]>")))

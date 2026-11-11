@@ -1303,7 +1303,12 @@ article h5,article h6{font-size:1rem}
   (binding [*input-dir*  (str (fs/canonicalize (or input-dir ".")))
             *output-dir* (str (fs/canonicalize (or output-dir "public")))]
     (let [config (load-config (dissoc overrides :input-dir :output-dir :skip-dirs))
-          extra  (into (set skip-dirs) (:skip-dirs config))
+          extra  (cond-> (into (set skip-dirs) (:skip-dirs config))
+                   ;; An output dir inside the input dir (other than
+                   ;; the default public/) must not be read as content,
+                   ;; or each build would copy it into itself.
+                   (str/starts-with? *output-dir* (str *input-dir* "/"))
+                   (conj (str (fs/relativize *input-dir* *output-dir*))))
           tags   (:exclude-tags config)]
       (binding [*ignored-dirs*  (into *ignored-dirs* extra)
                 *excluded-tags* (if tags (set (map name tags)) *excluded-tags*)
