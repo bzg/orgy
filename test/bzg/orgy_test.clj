@@ -169,10 +169,15 @@
         put  (fn [rel s] (fs/create-dirs (fs/parent (fs/path root rel)))
                (spit (str (fs/path root rel)) s))]
     (try
-      (put "config.edn" (pr-str {:base-url "https://ex.org"}))
+      (put "config.edn" (pr-str {:base-url "https://ex.org" :skip-dirs ["drafts"]}))
       (put "notes/a.org" "#+title: A\n#+date: 2024-01-01\n\nHello *world*.\n")
+      (put "drafts/d.org" "#+title: D\n\nDraft.\n")
+      (put "drafts/d.txt" "x")
       (with-out-str
         (orgy/build! {:input-dir root :output-dir out}))
+      (testing ":skip-dirs from config.edn is honoured"
+        (is (fs/exists? (str out "/notes/a/index.html")))
+        (is (not (fs/exists? (str out "/drafts")))))
       (testing "feed content is HTML inside CDATA, not escaped HTML"
         (is (str/includes? (slurp (str out "/feed.xml"))
                            "<![CDATA[<p>Hello <strong>world</strong>.</p>]]>")))

@@ -98,6 +98,7 @@
             :quick-search   (:quick-search cfg)
             :theme-toggle   (:theme-toggle cfg)
             :menu           (:menu cfg)
+            :skip-dirs      (:skip-dirs cfg)
             :exclude-tags   (:exclude-tags cfg)}
            (dissoc overrides :config-path :theme))))
 
