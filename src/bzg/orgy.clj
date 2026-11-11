@@ -545,9 +545,9 @@ article h5,article h6{font-size:1rem}
                    (subs target 1)
                    (resolve-rel-against-source target))
         fname    (str (fs/file-name (fs/path resolved)))
-        slug     (or (second (re-matches #"(.+?)\.\w{2}\.org$" fname))
+        slug     (or (second (re-matches #"(.+?)\.[a-zA-Z]{2}\.org$" fname))
                      (second (re-matches #"(.+?)\.org$" fname)))
-        lang     (or (second (re-matches #".*\.(\w{2})\.org$" fname)) "en")
+        lang     (or (second (re-matches #".*\.([a-zA-Z]{2})\.org$" fname)) "en")
         parts    (str/split resolved #"/")
         section  (when (> (count parts) 1) (first parts))
         lp       (if *monolingual* "" (str "/" lang))]
@@ -852,7 +852,7 @@ article h5,article h6{font-size:1rem}
 (defn- file-lang
   "foo.fr.org → \"fr\"; no suffix → nil."
   [path]
-  (second (re-matches #".*\.(\w{2})\.org$" (str (fs/file-name path)))))
+  (second (re-matches #".*\.([a-zA-Z]{2})\.org$" (str (fs/file-name path)))))
 
 (defn- lang-prefix
   "\"/{lang}\" in multilingual mode, \"\" in monolingual mode."
@@ -863,7 +863,7 @@ article h5,article h6{font-size:1rem}
   "some-post.fr.org → \"some-post\"."
   [path]
   (let [n (str (fs/file-name path))]
-    (or (second (re-matches #"(.+?)\.\w{2}\.org$" n))
+    (or (second (re-matches #"(.+?)\.[a-zA-Z]{2}\.org$" n))
         (second (re-matches #"(.+?)\.org$" n)))))
 
 (defn- file-section
@@ -876,7 +876,7 @@ article h5,article h6{font-size:1rem}
   "True if file is an index.org (optionally language-suffixed)."
   [path]
   (let [name (str (fs/file-name path))]
-    (re-matches #"index(?:\.\w{2})?\.org" name)))
+    (re-matches #"index(?:\.[a-zA-Z]{2})?\.org" name)))
 
 (defn- prescan-org-file
   "Read an org file and extract lightweight metadata via regex.

@@ -121,6 +121,10 @@
 
 (deftest file-lang-test
   (is (= nil (file-lang "post.org")))
+  (testing "a two-character suffix with digits is not a language"
+    (is (= nil (file-lang "release.v2.org")))
+    (is (= nil (file-lang "notes-1.10.org")))
+    (is (= "release.v2" (file-slug "release.v2.org"))))
   (is (= "fr" (file-lang "post.fr.org")))
   (is (= "en" (file-lang "notes/my-post.en.org"))))
 
