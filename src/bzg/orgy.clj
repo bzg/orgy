@@ -501,8 +501,11 @@ article h5,article h6{font-size:1rem}
     (str (subs s 0 n) "...")
     s))
 
-(defn- escape-html [s]
-  (-> s
+(defn- escape-html
+  "Escape s for HTML text and attribute values. nil gives \"\": organ
+  omits :content on an empty block."
+  [s]
+  (-> (str s)
       (str/replace "&" "&amp;")
       (str/replace "<" "&lt;")
       (str/replace ">" "&gt;")

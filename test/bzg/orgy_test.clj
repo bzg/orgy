@@ -157,7 +157,17 @@
   (is (= "exactly..." (truncate "exactly ten chars" 7))))
 
 (deftest escape-html-test
-  (is (= "&lt;a&gt;&amp;&quot;" (escape-html "<a>&\""))))
+  (is (= "&lt;a&gt;&amp;&quot;" (escape-html "<a>&\"")))
+  (is (= "" (escape-html nil))))
+
+;; ---------------------------------------------------------------------------
+;; Blocks
+;; ---------------------------------------------------------------------------
+
+(deftest block-html-test
+  (testing "an empty src block renders instead of throwing"
+    (is (= "<pre><code></code></pre>"
+           (ast->html (organ/parse-org "#+begin_src\n#+end_src\n"))))))
 
 ;; ---------------------------------------------------------------------------
 ;; build! end to end
