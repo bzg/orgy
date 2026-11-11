@@ -376,7 +376,7 @@ article h5,article h6{font-size:1rem}
       <link>{{site.base-url}}{{post.url}}</link>
       <guid>{{site.base-url}}{{post.url}}</guid>
       {% if post.date %}<pubDate>{{post.rfc822-date}}</pubDate>{% endif %}
-      <description><![CDATA[{{post.content}}]]></description>
+      <description><![CDATA[{{post.content|safe}}]]></description>
     </item>
     {% endfor %}
   </channel>

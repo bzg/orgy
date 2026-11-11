@@ -160,6 +160,25 @@
   (is (= "&lt;a&gt;&amp;&quot;" (escape-html "<a>&\""))))
 
 ;; ---------------------------------------------------------------------------
+;; build! end to end
+;; ---------------------------------------------------------------------------
+
+(deftest build-test
+  (let [root (str (fs/create-temp-dir {:prefix "orgy-test"}))
+        out  (str root "/out")
+        put  (fn [rel s] (fs/create-dirs (fs/parent (fs/path root rel)))
+               (spit (str (fs/path root rel)) s))]
+    (try
+      (put "config.edn" (pr-str {:base-url "https://ex.org"}))
+      (put "notes/a.org" "#+title: A\n#+date: 2024-01-01\n\nHello *world*.\n")
+      (with-out-str
+        (orgy/build! {:input-dir root :output-dir out}))
+      (testing "feed content is HTML inside CDATA, not escaped HTML"
+        (is (str/includes? (slurp (str out "/feed.xml"))
+                           "<![CDATA[<p>Hello <strong>world</strong>.</p>]]>")))
+      (finally (fs/delete-tree root)))))
+
+;; ---------------------------------------------------------------------------
 ;; iso->rfc822
 ;; ---------------------------------------------------------------------------
 
