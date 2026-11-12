@@ -632,15 +632,24 @@ article h5,article h6{font-size:1rem}
 
 (declare render-inline)
 
+(defn- heading-slug
+  "Anchor of a heading, from the inline nodes of its title."
+  [title]
+  (-> (or (organ/inline-text title) "") str/lower-case
+      (str/replace #"[^\p{L}\p{N}\s-]" "") str/trim (str/replace #"\s+" "-") not-empty))
+
 (defn- render-link [node]
-  (let [url (or (resolve-file-url node) "")
+  (let [heading (when (= :heading (:link-type node)) (:target node))
+        url (if heading
+              (str "#" (heading-slug (organ/parse-inline heading)))
+              (or (resolve-file-url node) ""))
         e   escape-html]
     (if (image-link? node)
       (let [alt (or (organ/inline-text (:children node)) "")]
         (str "<img src=\"" (e url) "\" alt=\"" (e alt) "\""
              (when (str/blank? alt) " role=\"presentation\"") ">"))
       (str "<a href=\"" (e url) "\">"
-           (if (seq (:children node)) (render-inline (:children node)) (e url))
+           (if (seq (:children node)) (render-inline (:children node)) (e (or heading url)))
            "</a>"))))
 
 (defn- render-inline
@@ -658,7 +667,7 @@ article h5,article h6{font-size:1rem}
                     (= t :link)            (render-link node)
                     (= t :footnote-ref)    (let [l (escape-html (:label node))]
                                              (str "<sup><a href=\"#fn-" l "\" id=\"fnref-" l "\">" l "</a></sup>"))
-                    (= t :timestamp)       (:raw node)
+                    (#{:timestamp :macro} t) (escape-html (:raw node))
                     (= t :latex-fragment)  (let [v (escape-html (:value node))]
                                              (case (:kind node)
                                                (:paren :dollar)    (str "\\(" v "\\)")
@@ -753,7 +762,7 @@ article h5,article h6{font-size:1rem}
     :section      (let [level (inc (:level node))
                         body  (render-children (:children node))
                         props (:properties node)
-                        id    (or (:custom_id props) (:id props))
+                        id    (or (:custom_id props) (:id props) (heading-slug (:title node)))
                         attr  (when id (str " id=\"" (escape-html id) "\""))]
                     (if (<= level 6)
                       (str "<h" level attr ">" (render-inline (:title node)) "</h" level ">\n" body)

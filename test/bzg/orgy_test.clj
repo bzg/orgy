@@ -164,6 +164,11 @@
   (is (= "&lt;a&gt;&amp;&quot;" (escape-html "<a>&\"")))
   (is (= "" (escape-html nil))))
 
+(deftest macro-and-timestamp-html-test
+  (testing "macro calls and timestamps are kept as written, escaped"
+    (is (= "<p>{{{rb(a, &lt;b&gt;)}}} &lt;2025-01-15 Wed&gt;</p>"
+           (ast->html (organ/parse-org "{{{rb(a, <b>)}}} <2025-01-15 Wed>\n"))))))
+
 ;; ---------------------------------------------------------------------------
 ;; Blocks
 ;; ---------------------------------------------------------------------------
@@ -295,12 +300,18 @@
                        :properties {:id "a" :custom_id "b"}
                        :children []})
          "id=\"b\"")))
-  (testing "no id when neither property is set"
+  (testing "the id comes from the title when neither property is set"
     (is (str/includes?
          (render-node {:type :section :level 1
                        :title [{:type :text :value "T"}]
                        :children []})
-         "<h2>T</h2>"))))
+         "<h2 id=\"t\">T</h2>")))
+  (testing "a link to a heading points to that id, even when the heading holds a link"
+    (let [html (ast->html (organ/parse-org
+                           (str "* An [[file:a.org][example]]\n"
+                                "[[*An \\[\\[file:a.org\\]\\[example\\]\\]][above]] [[*An example]]\n")))]
+      (is (str/includes? html "<h2 id=\"an-example\">"))
+      (is (str/includes? html "<a href=\"#an-example\">above</a> <a href=\"#an-example\">An example</a>")))))
 
 (deftest resolve-languages-test
   (testing "explicit config wins and is unioned with posts"
