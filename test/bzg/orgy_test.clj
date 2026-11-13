@@ -164,6 +164,11 @@
   (is (= "&lt;a&gt;&amp;&quot;" (escape-html "<a>&\"")))
   (is (= "" (escape-html nil))))
 
+(deftest caption-html-test
+  (is (= (str "<figure><img src=\"https://x.org/i.png\" alt=\"A bold move\">"
+              "<figcaption>A <strong>bold</strong> move</figcaption></figure>")
+         (ast->html (organ/parse-org "#+caption: A *bold* move\n[[https://x.org/i.png]]\n")))))
+
 (deftest macro-and-timestamp-html-test
   (testing "macro calls and timestamps are kept as written, escaped"
     (is (= "<p>{{{rb(a, &lt;b&gt;)}}} &lt;2025-01-15 Wed&gt;</p>"

@@ -722,7 +722,7 @@ article h5,article h6{font-size:1rem}
   "Render a standalone image link as <img> (optionally wrapped in <figure>)."
   [link attrs caption]
   (let [url   (resolve-file-url link)
-        alt   (or (:alt attrs) (organ/inline-text (:children link)) caption "")
+        alt   (or (:alt attrs) (organ/inline-text (:children link)) (organ/inline-text caption) "")
         align (some-> (:align attrs) str/trim str/lower-case)
         cls   (when (#{"left" "right" "center"} align) (str "align-" align))
         extra (cond-> (dissoc attrs :alt :align)
@@ -733,7 +733,7 @@ article h5,article h6{font-size:1rem}
                    (attrs-str extra) ">")]
     (if caption
       (str "<figure" (when cls (str " class=\"" cls "\"")) ">"
-           img "<figcaption>" (escape-html caption) "</figcaption></figure>")
+           img "<figcaption>" (render-inline caption) "</figcaption></figure>")
       img)))
 
 (def ^:private org-keyword-re #"^\s*#\+\w+(?:\[\])?\s*:.*")
